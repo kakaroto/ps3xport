@@ -703,6 +703,7 @@ archive_add (const char *path, const char *game)
   int open = FALSE;
   FILE *fd = NULL;
   DIR *dir_fd = NULL;
+  u32 total_file_size = 0;
   u8 key[0x10];
   u8 iv[0x10];
   u8 hmac[0x40];
@@ -759,6 +760,7 @@ archive_add (const char *path, const char *game)
   header.type = TO_BE (32, header.type);
   if (paged_file_write (&out, &header, sizeof(header)) != sizeof(header))
     die ("Couldn't write file header\n");
+  total_file_size += sizeof(header);
 
   if (!archive_gen_keys (&header, key, iv, hmac))
     die ("Error generating keys\n");
@@ -769,12 +771,16 @@ archive_add (const char *path, const char *game)
 
   if (paged_file_write (&out, &header2, sizeof(header2)) != sizeof(header2))
     die ("Couldn't write encrypted header\n");
+  total_file_size += sizeof(header2);
 
   while (1) {
     int read = paged_file_read (&in, buffer, sizeof(buffer));
     if (read == 0)
       break;
+    if (total_file_size + read > 0xFFFFFE00)
+      die ("Output file is too big\n");
     paged_file_write (&out, buffer, read);
+    total_file_size += read;
   }
   paged_file_close (&in);
 
@@ -795,8 +801,11 @@ archive_add (const char *path, const char *game)
       int read = fread (buffer, 1, sizeof(buffer), fd);
       if (read == 0)
         break;
-      /* TODO : Must make sure we never exceed a file size of 0xFFE0 */
+      /* TODO : Must be able to exceed a file size of 0xFFFFFE00 by splitting */
+      if (total_file_size + read > 0xFFFFFE00)
+        die ("Output file is too big\n");
       paged_file_write (&out, buffer, read);
+      total_file_size += read;
     }
 
     fclose (fd);
