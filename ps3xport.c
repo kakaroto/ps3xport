@@ -730,7 +730,18 @@ archive_add (const char *path, const char *game)
   }
   chained_list_free (dirs);
 
-  snprintf (buffer, sizeof(buffer), "%s/archive_%02d.dat", path, index);
+  /* TODO : try to write to a different file instead of appending to an existing one */
+  while (1) {
+    snprintf (buffer, sizeof(buffer), "%s/archive_%02d.dat", path, index);
+    if (!file_exists (buffer)) {
+      if (index == 0)
+        break;
+      index--;
+      break;
+    }
+    index++;
+  }
+
   if (!archive_open (buffer, &in, &header))
     die ("Couldn't open archive %d\n", index);
 
@@ -740,10 +751,6 @@ archive_add (const char *path, const char *game)
     die ("Wrong archive ID\n");
   if (FROM_BE (32, header2.index) != index)
     die ("Wrong archive index\n");
-  /* TODO: Loop until we find the last archive_%02d.dat and use that instead */
-  /* TODO 2 : try to write to a different file instead of appending to an existing one */
-  //index++;
-
   snprintf (buffer, sizeof(buffer), "%s/archive_%02d.tmp", path, index);
   if (!paged_file_open (&out, buffer, FALSE))
     die ("Couldn't open output archive %d\n", index);
