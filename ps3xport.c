@@ -16,8 +16,6 @@
 #include <sys/types.h>
 #include <dirent.h>
 
-#include "known_keys.c"
-
 #define PS3XPORT_VERSION "0.1"
 
 #undef DEBUG
@@ -174,23 +172,22 @@ chained_list_free (ChainedList *list)
 static void
 generate_random_key_seed (u8 *seed)
 {
-  /* TODO : FIX */
-  memcpy (seed, known_keys[0].seed, 0x14);
+  get_rand (seed, 0x14);
 }
 
 static void
 sc_encrypt_with_portability (int type, u8 *buffer, u8 *iv)
 {
-  /* TODO : FIX */
-  unsigned int i;
-  for (i = 0; i < sizeof(known_keys) / sizeof(known_keys[0]); i++) {
-    if (memcmp (known_keys[i].seed, buffer, 0x14) == 0) {
-      memcpy (buffer, known_keys[i].result, 0x40);
-      return;
-    }
-  }
+  static u8 keys[][16] = {
+    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+    {0xFA, 0x72, 0xCE, 0xEF, 0x59, 0xB4, 0xD2, 0x98,
+     0x9F, 0x11, 0x19, 0x13, 0x28, 0x7F, 0x51, 0xC7},
+  };
+  if (type != 1)
+    return;
 
-  die ("Could not find a known key for your archive's seed\n");
+  aes128cbc_enc (keys[type], iv, buffer, 0x40, buffer);
 }
 
 static void
@@ -904,7 +901,7 @@ main (int argc, char *argv[])
 
       if (i + 1 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
-      i ++;
+      i++;
       if (strlen (argv[i]) != 32)
         die ("Device ID must be 16 bytes and in hex format\n");
       for (j = 0; j < 32; j += 2) {
