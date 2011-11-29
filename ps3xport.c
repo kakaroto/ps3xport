@@ -1091,26 +1091,6 @@ main (int argc, char *argv[])
           memset (key, 0, 0x40);
           memset (iv, 0, 0x10);
           memcpy (key, data + j, 0x40);
-          //aes256cbc (data + j, iv, input, 0x40, output);
-          aes256cbc (key, iv, input, 0x40, output);
-          if (memcmp (expected, output, 0x40) == 0) {
-            printf ("\nFound the key for method %s %d\n",
-                type < 4 ? "sc_encrypt_with_portability" : "sc_encrypt", type);
-            printf ("aes256cbc key:\n");
-            hex_dump (data + j, 0x10);
-            printf ("expected:\n");
-            hex_dump (expected, 0x40);
-            printf ("output:\n");
-            hex_dump (output, 0x40);
-            printf ("\n");
-            break;
-          }
-
-          memset (output, 0, 0x40);
-          memset (input, 0, 0x40);
-          memset (key, 0, 0x40);
-          memset (iv, 0, 0x10);
-          memcpy (key, data + j, 0x40);
           //aes256cbc_enc (data + j, iv, input, 0x40, output);
           aes256cbc_enc (key, iv, input, 0x40, output);
           if (memcmp (expected, output, 0x40) == 0) {
@@ -1157,26 +1137,6 @@ main (int argc, char *argv[])
             printf ("\nFound the key for method %s %d\n",
                 type < 4 ? "sc_encrypt_with_portability" : "sc_encrypt", type);
             printf ("aes128cfb key:\n");
-            hex_dump (data + j, 0x10);
-            printf ("expected:\n");
-            hex_dump (expected, 0x40);
-            printf ("output:\n");
-            hex_dump (output, 0x40);
-            printf ("\n");
-            break;
-          }
-
-          memset (output, 0, 0x40);
-          memset (input, 0, 0x40);
-          memset (key, 0, 0x40);
-          memset (iv, 0, 0x10);
-          memcpy (key, data + j, 0x40);
-          //aes128cbc (data + j, iv, input, 0x40, output);
-          aes128cbc (key, iv, input, 0x40, output);
-          if (memcmp (expected, output, 0x40) == 0) {
-            printf ("\nFound the key for method %s %d\n",
-                type < 4 ? "sc_encrypt_with_portability" : "sc_encrypt", type);
-            printf ("aes128cbc key:\n");
             hex_dump (data + j, 0x10);
             printf ("expected:\n");
             hex_dump (expected, 0x40);
