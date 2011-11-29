@@ -1051,39 +1051,33 @@ main (int argc, char *argv[])
         switch (type) {
           case 0:
             sc_encrypt_with_portability (0, expected, iv);
-            hex_dump (expected, 0x40);
             break;
           case 1:
             sc_encrypt_with_portability (1, expected, iv);
-            hex_dump (expected, 0x40);
             break;
           case 2:
             sc_encrypt_with_portability (2, expected, iv);
-            hex_dump (expected, 0x40);
             break;
           case 3:
             sc_encrypt_with_portability (3, expected, iv);
-            hex_dump (expected, 0x40);
             break;
           case 4:
             sc_encrypt (0, expected, iv);
-            hex_dump (expected, 0x40);
             break;
           case 5:
             sc_encrypt (1, expected, iv);
-            hex_dump (expected, 0x40);
             break;
           case 6:
             sc_encrypt (2, expected, iv);
-            hex_dump (expected, 0x40);
             break;
           case 7:
             sc_encrypt (3, expected, iv);
-            hex_dump (expected, 0x40);
             break;
           default:
             die ("Method must be between 0 and 7\n");
         }
+
+        //hex_dump (expected, 0x40);
 
         for (j = 0; j < len - 0x10; j++) {
           memset (output, 0, 0x40);
@@ -1098,10 +1092,12 @@ main (int argc, char *argv[])
                 type < 4 ? "sc_encrypt_with_portability" : "sc_encrypt", type);
             printf ("aes256cbc_enc key:\n");
             hex_dump (data + j, 0x10);
+/*
             printf ("expected:\n");
             hex_dump (expected, 0x40);
             printf ("output:\n");
             hex_dump (output, 0x40);
+*/
             printf ("\n");
             break;
           }
@@ -1118,10 +1114,12 @@ main (int argc, char *argv[])
                 type < 4 ? "sc_encrypt_with_portability" : "sc_encrypt", type);
             printf ("aes128ctr key:\n");
             hex_dump (data + j, 0x10);
+/*
             printf ("expected:\n");
             hex_dump (expected, 0x40);
             printf ("output:\n");
             hex_dump (output, 0x40);
+*/
             printf ("\n");
             break;
           }
@@ -1138,10 +1136,12 @@ main (int argc, char *argv[])
                 type < 4 ? "sc_encrypt_with_portability" : "sc_encrypt", type);
             printf ("aes128cfb key:\n");
             hex_dump (data + j, 0x10);
+/*
             printf ("expected:\n");
             hex_dump (expected, 0x40);
             printf ("output:\n");
             hex_dump (output, 0x40);
+*/
             printf ("\n");
             break;
           }
@@ -1158,10 +1158,12 @@ main (int argc, char *argv[])
                 type < 4 ? "sc_encrypt_with_portability" : "sc_encrypt", type);
             printf ("aes128cbc_enc key:\n");
             hex_dump (data + j, 0x10);
+/*
             printf ("expected:\n");
             hex_dump (expected, 0x40);
             printf ("output:\n");
             hex_dump (output, 0x40);
+*/
             printf ("\n");
             break;
           }
