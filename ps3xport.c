@@ -39,7 +39,8 @@
   "\t  Parse archive.dat: Parse the index file and print info\n"        \
   "\t  Decrypt archive[_XX].dat output: Decrypt the given file\n"       \
   "\t  Dump backup_dir destination: Extract the whole backup to the destination\n" \
-  "\t  Add backup_dir directory: Add the given directory and subdirs to the backup\n\n"
+  "\t  Add backup_dir directory: Add the given directory and subdirs to the backup\n\n" \
+  "\t  TestBinary method filename: Test binary file for keys to method (0-7)\n\n"
 
 
 typedef struct _ChainedList ChainedList;
@@ -914,6 +915,84 @@ main (int argc, char *argv[])
       printf ("Device ID set to : ");
       print_hash (device_id, 16);
       printf ("\n");
+    } else if (strcmp (argv[i], "TestBinary") == 0) {
+      FILE *in;
+      char *data;
+      unsigned int len;
+      int type;
+
+      if (i + 2 >= argc)
+        die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
+
+      if (argv[i+1][1] != 0)
+        die ("Method must be between 0 and 7\n");
+      type = argv[i+1][0] - '0';
+      if (type < 0 || type > 7)
+        die ("Method must be between 0 and 7\n");
+
+      in = fopen (argv[i+2], "rb");
+      if (in == NULL)
+        die ("Unable to open %s", argv[i+2]);
+      fseek (in, 0, SEEK_END);
+      len = ftell (in);
+      fseek (in, 0, SEEK_SET);
+      data = malloc (len);
+
+      if (fread (data, 1, len, in) != len)
+        die ("Unable to read index.dat file");
+      fclose (in);
+      i += 2;
+      {
+        char seed[0x14] = {0};
+        char iv[0x10] = {0};
+        char expected[0x40];
+        char input[0x40] = {0};
+        char output[0x40];
+        int j;
+
+        memset (input, 0, 0x40);
+        memset (expected, 0, 0x40);
+        memset (iv, 0, 0x10);
+        switch (type) {
+          case 0:
+            sc_encrypt_with_portability (0, expected, iv);
+            break;
+          case 1:
+            sc_encrypt_with_portability (1, expected, iv);
+            break;
+          case 2:
+            sc_encrypt_with_portability (2, expected, iv);
+            break;
+          case 3:
+            sc_encrypt_with_portability (3, expected, iv);
+            break;
+          case 4:
+            sc_encrypt (0, expected, iv);
+            break;
+          case 5:
+            sc_encrypt (1, expected, iv);
+            break;
+          case 6:
+            sc_encrypt (2, expected, iv);
+            break;
+          case 7:
+            sc_encrypt (3, expected, iv);
+            break;
+          default:
+            die ("Method must be between 0 and 7\n");
+        }
+
+        for (j = 0; j < len - 0x10; j++) {
+          aes128cbc_enc (data + j, iv, input, 0x40, output);
+          if (memcmp (expected, output, 0x40) == 0) {
+            printf ("Found the key for method %s %d\n",
+                type < 4 ? "sc_encrypt_with_portability" : "sc_encrypt", type);
+            hex_dump (data + j, 0x10);
+            break;
+          }
+        }
+        free (data);
+      }
     } else {
       die (USAGE_STRING "Error: Unknown command\n", argv[0]);
     }
