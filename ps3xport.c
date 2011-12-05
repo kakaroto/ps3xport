@@ -36,11 +36,11 @@
   "  Usage: %s command [argument ...] [command ...]\n"                  \
   "    Commands : \n"                                                   \
   "\t  SetDeviceID HEX: Set the DeviceID needed for decrypting archive2.dat\n" \
+  "\t  SetEncryptedDeviceID HEX: Set the Encrypted DeviceID needed for decrypting archive2.dat\n" \
   "\t  Parse archive.dat: Parse the index file and print info\n"        \
   "\t  Decrypt archive[_XX].dat output: Decrypt the given file\n"       \
   "\t  Dump backup_dir destination: Extract the whole backup to the destination\n" \
-  "\t  Add backup_dir directory: Add the given directory and subdirs to the backup\n\n" \
-  "\t  TestBinary method filename: Test binary file for keys to method (0-7)\n\n"
+  "\t  Add backup_dir directory: Add the given directory and subdirs to the backup\n\n"
 
 
 typedef struct _ChainedList ChainedList;
@@ -83,12 +83,12 @@ typedef struct {
     } eos;
   };
   FileStat stat;
-  u32 flags; /* 2 == dev_flash2 */
+  u32 flags; /* must be 1 for normal or 3 for dev_flash2 */
 } ArchiveDirectory;
 
 typedef struct {
   u64 id;
-  u64 footer;
+  u64 archive2_size; // total_filesize of the other archive index
   u8 psid[0x10];
   ChainedList *files;
   u64 total_files;
@@ -115,7 +115,7 @@ typedef struct {
 
 typedef struct {
   u8 psid[0x10];
-  u64 unknown;
+  u64 archive2_size;
   u64 zero;
 } IndexArchiveFooter;
 
@@ -127,6 +127,8 @@ typedef struct {
 
 static u8 device_id[0x10];
 static int device_id_set;
+static u8 encrypted_device_id[0x40];
+static int encrypted_device_id_set;
 
 static ChainedList *
 chained_list_append (ChainedList *list, void *data)
@@ -190,101 +192,26 @@ sc_encrypt_with_portability (int type, u8 *buffer, u8 *iv)
      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
   };
 
-  static u8 expected[][0x40] = {
-    {0x38,0xDC,0x47,0x42,0x95,0x58,0x2B,0xD8, 0x49,0xC4,0xF4,0x5E,0xB6,0x22,0x63,0xBB,
-     0xFA,0x81,0x91,0x64,0x60,0x8C,0x4F,0x9A, 0x5C,0x5A,0xC3,0x5C,0x42,0x17,0x36,0xBB,
-     0x95,0x29,0x2C,0x24,0xD6,0x51,0x3E,0xB1, 0x2F,0xF8,0x85,0x04,0x73,0xB1,0x11,0xE7,
-     0xCF,0x0D,0xFC,0xE3,0xB6,0xDB,0x3A,0xD4, 0xCF,0x64,0x9A,0x9A,0xBA,0xBA,0xBD,0x94},
-    {0},
-    {0},
-    {0x38,0xDC,0x47,0x42,0x95,0x58,0x2B,0xD8, 0x49,0xC4,0xF4,0x5E,0xB6,0x22,0x63,0xBB,
-     0xFA,0x81,0x91,0x64,0x60,0x8C,0x4F,0x9A, 0x5C,0x5A,0xC3,0x5C,0x42,0x17,0x36,0xBB,
-     0x95,0x29,0x2C,0x24,0xD6,0x51,0x3E,0xB1, 0x2F,0xF8,0x85,0x04,0x73,0xB1,0x11,0xE7,
-     0xCF,0x0D,0xFC,0xE3,0xB6,0xDB,0x3A,0xD4, 0xCF,0x64,0x9A,0x9A,0xBA,0xBA,0xBD,0x94},
-  };
-
-  printf ("encrypt_with_portability type=%d\n", type);
-
   switch ( type )
   {
     case 0:
-      memcpy (buffer, expected[type], 0x40);
-      //aes128cbc_enc (keys[type], iv, buffer, 0x40, buffer);
+    case 3:
+      die ("sc_encrypt_with_portability method 0 and 3 have unknown keys");
       break;
     case 1:
-      aes128cbc_enc (keys[type], iv, buffer, 0x40, buffer);
-      break;
     case 2:
       aes128cbc_enc (keys[type], iv, buffer, 0x40, buffer);
       break;
-    case 3:
-      memcpy (buffer, expected[type], 0x40);
-      //aes128cbc_enc (keys[type], iv, buffer, 0x40, buffer);
+    default:
+      die ("sc_encrypt_with_portability Unknown method");
       break;
   }
-
-  return;
 }
 
 static void
 sc_encrypt (int type, u8 *buffer, u8 *iv)
 {
-  static u8 keys[][16] = {
-    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-  };
-
-  static u8 expected[][0x40] = {
-    {0x0B,0xCF,0x9D,0x06,0x47,0x6D,0x59,0x6F, 0x85,0xD4,0x1F,0xD9,0x4B,0xBA,0x60,0x58,
-     0xFC,0xAD,0x5A,0xBF,0xC6,0x53,0x47,0xE1, 0xE3,0x79,0x24,0x43,0x18,0xAF,0x3B,0xCC,
-     0x0D,0x1E,0xEA,0xA0,0xA3,0x3F,0x98,0x52, 0x8C,0x35,0xB1,0x25,0x12,0xB6,0x3A,0x36,
-     0xAF,0x73,0xBA,0x7C,0x43,0x4B,0x24,0xEB, 0x25,0x86,0x64,0x3D,0x70,0x8F,0x0D,0x71},
- 
-    {0x19,0x30,0x37,0xFA,0x8F,0x48,0xB6,0x6B, 0x80,0x8B,0xAE,0x92,0xCB,0x0D,0xB4,0x4D,
-     0x18,0xF6,0xF9,0x79,0xC1,0xDF,0x71,0xAF, 0x68,0x77,0xBC,0x36,0x35,0x75,0x56,0x4F,
-     0x59,0x11,0x09,0x64,0xB7,0x4A,0xE1,0x4C, 0x98,0x38,0x06,0xDE,0x17,0x54,0x84,0x52,
-     0x00,0xB4,0x75,0xDE,0xA0,0xDC,0xCB,0xCF, 0x4B,0x38,0x7B,0x31,0x43,0xEF,0xC7,0x1F},
- 
-    {0x30,0x2E,0xDA,0xF2,0xAB,0xCA,0xD4,0x84, 0x59,0x0B,0x04,0x24,0x77,0x1D,0x1C,0x9F,
-     0xB4,0xD2,0x73,0x54,0xD3,0xB3,0x04,0xED, 0x5A,0x68,0xB6,0xFB,0x02,0xA4,0x68,0x78,
-     0xF9,0xDC,0x4B,0xFD,0x6B,0xA9,0x8A,0x28, 0x12,0x6B,0x2B,0x32,0x9C,0x1F,0x08,0x80,
-     0xF5,0x71,0xC6,0xD4,0x69,0x3D,0xDE,0x25, 0x70,0x3F,0x21,0xB7,0x89,0x7C,0xDC,0x25},
- 
-    {0x61,0x83,0xD6,0xAE,0xD0,0x41,0xE9,0x48, 0xEF,0xD8,0x35,0xE4,0x00,0xCE,0x79,0x0F,
-     0x58,0xAB,0xE7,0x8C,0xC2,0x7E,0x62,0x0B, 0xA2,0xAC,0x77,0xCF,0xEB,0x86,0xA3,0x32,
-     0x16,0xAC,0x3B,0xDC,0xE6,0x32,0x75,0x75, 0xBB,0xCC,0xEE,0x81,0xE7,0x0C,0xBB,0x79,
-     0x9F,0x88,0xFB,0x3C,0x68,0x9A,0x2D,0x88, 0xFB,0x69,0x6F,0xC8,0x58,0x96,0x94,0xBE},
-  };
-
-  printf ("encrypt type=%d\n", type);
-
-  switch ( type )
-  {
-    case 0:
-      memcpy (buffer, expected[type], 0x40);
-      //aes128cbc_enc (keys[type], iv, buffer, 0x40, buffer);
-      break;
-    case 1:
-      memcpy (buffer, expected[type], 0x40);
-      //aes128cbc_enc (keys[type], iv, buffer, 0x40, buffer);
-      break;
-    case 2:
-      memcpy (buffer, expected[type], 0x40);
-      //aes128cbc_enc (keys[type], iv, buffer, 0x40, buffer);
-      break;
-    case 3:
-      memcpy (buffer, expected[type], 0x40);
-      //aes128cbc_enc (keys[type], iv, buffer, 0x40, buffer);
-      break;
-  }
-
-  return;
+  die ("sc_encrypt not yet supported");
 }
 
 static int
@@ -296,10 +223,14 @@ archive_gen_keys (ArchiveHeader *header, u8 *key, u8 *iv, u8 *hmac)
   memset (buffer, 0, 0x40);
   memset (zero_iv, 0, 0x10);
   if (header->size == 0x30) {
-    if (!device_id_set)
-      die ("Device ID is not set. You must set it with the command SetDeviceID\n");
-    memcpy (buffer, device_id, 0x10);
-    sc_encrypt (3, buffer, zero_iv);
+    if (encrypted_device_id_set) {
+      memcpy (buffer, encrypted_device_id, 0x40);
+    } else {
+      if (!device_id_set)
+        die ("Device ID is not set. You must set it with the command SetDeviceID\n");
+      memcpy (buffer, device_id, 0x10);
+      sc_encrypt (3, buffer, zero_iv);
+    }
   } else {
     memcpy (buffer, header->key_seed, 0x14);
     sc_encrypt_with_portability (1, buffer, zero_iv);
@@ -410,7 +341,7 @@ index_archive_read (IndexArchive *archive, const char *path)
   ArchiveEncryptedHeader header2;
   IndexArchiveFooter footer;
 
-  archive->id = archive->footer = 0;
+  archive->id = archive->archive2_size = 0;
   archive->files = archive->dirs = NULL;
   archive->total_files = archive->total_file_sizes = archive->total_dirs = 0;
 
@@ -480,7 +411,7 @@ index_archive_read (IndexArchive *archive, const char *path)
       goto end;
     }
     memcpy (archive->psid, footer.psid, 0x10);
-    archive->footer = footer.unknown;
+    archive->archive2_size = footer.archive2_size;
   }
 
   paged_file_close (&file);
@@ -603,7 +534,7 @@ index_archive_write (IndexArchive *archive, const char *path)
 
   if (header2.unknown1 == 5) {
     memcpy (footer.psid, archive->psid, 0x10);
-    footer.unknown = archive->footer;
+    footer.archive2_size = archive->archive2_size;
     footer.zero = 0;
     if (paged_file_write (&file, &footer, sizeof(footer)) != sizeof(footer)) {
       DBG ("Couldn't write footer\n");
@@ -963,8 +894,8 @@ main (int argc, char *argv[])
         die ("Error parsing archive!\n");
       printf ("Backup id : ");
       print_hash ((u8 *) &archive.id, 8);
-      printf ("\nFooter : ");
-      print_hash ((u8 *) &archive.footer, 8);
+      printf ("\nTotal filesize of the copy-protected content : ");
+      print_hash ((u8 *) &archive.archive2_size, 8);
       printf ("\nYour Open PSID : ");
       print_hash (archive.psid, 16);
       printf ("\nTotal directories : %llu\n", archive.total_dirs);
@@ -1004,173 +935,24 @@ main (int argc, char *argv[])
       printf ("Device ID set to : ");
       print_hash (device_id, 16);
       printf ("\n");
-    } else if (strcmp (argv[i], "TestBinary") == 0) {
-      FILE *in;
-      u8 *data;
-      unsigned int len;
-      unsigned int j;
-      int type;
+    } else if (strcmp (argv[i], "SetEncryptedDeviceID") == 0) {
+      int j;
 
-      if (i + 2 >= argc)
+      if (i + 1 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
-
-      if (argv[i+1][1] != 0)
-        die ("Method must be between 0 and 7\n");
-      type = argv[i+1][0] - '0';
-      if (type < 0 || type > 7)
-        die ("Method must be between 0 and 7\n");
-
-      in = fopen (argv[i+2], "rb");
-      if (in == NULL)
-        die ("Unable to open %s", argv[i+2]);
-      fseek (in, 0, SEEK_END);
-      len = ftell (in);
-      fseek (in, 0, SEEK_SET);
-      data = malloc (len);
-
-      if (fread (data, 1, len, in) != len)
-        die ("Unable to read index.dat file");
-      fclose (in);
-      i += 2;
-      {
-        u8 seed[0x14] = {0};
-        u8 iv[0x10] = {0};
-        u8 key[0x40] = {0};
-        u8 expected[0x40];
-        u8 input[0x40] = {0};
-        u8 output[0x40];
-
-        memset (expected, 0, 0x40);
-        memset (output, 0, 0x40);
-        memset (input, 0, 0x40);
-        memset (key, 0, 0x40);
-        memset (iv, 0, 0x10);
-
-        printf("\n");
-
-        switch (type) {
-          case 0:
-            sc_encrypt_with_portability (0, expected, iv);
-            break;
-          case 1:
-            sc_encrypt_with_portability (1, expected, iv);
-            break;
-          case 2:
-            sc_encrypt_with_portability (2, expected, iv);
-            break;
-          case 3:
-            sc_encrypt_with_portability (3, expected, iv);
-            break;
-          case 4:
-            sc_encrypt (0, expected, iv);
-            break;
-          case 5:
-            sc_encrypt (1, expected, iv);
-            break;
-          case 6:
-            sc_encrypt (2, expected, iv);
-            break;
-          case 7:
-            sc_encrypt (3, expected, iv);
-            break;
-          default:
-            die ("Method must be between 0 and 7\n");
-        }
-
-        //hex_dump (expected, 0x40);
-
-        for (j = 0; j < len - 0x10; j++) {
-          memset (output, 0, 0x40);
-          memset (input, 0, 0x40);
-          memset (key, 0, 0x40);
-          memset (iv, 0, 0x10);
-          memcpy (key, data + j, 0x40);
-          //aes256cbc_enc (data + j, iv, input, 0x40, output);
-          aes256cbc_enc (key, iv, input, 0x40, output);
-          if (memcmp (expected, output, 0x40) == 0) {
-            printf ("\nFound the key for method %s %d\n",
-                type < 4 ? "sc_encrypt_with_portability" : "sc_encrypt", type);
-            printf ("aes256cbc_enc key:\n");
-            hex_dump (data + j, 0x10);
-/*
-            printf ("expected:\n");
-            hex_dump (expected, 0x40);
-            printf ("output:\n");
-            hex_dump (output, 0x40);
-*/
-            printf ("\n");
-            break;
-          }
-
-          memset (output, 0, 0x40);
-          memset (input, 0, 0x40);
-          memset (key, 0, 0x40);
-          memset (iv, 0, 0x10);
-          memcpy (key, data + j, 0x40);
-          //aes128ctr (data + j, iv, input, 0x40, output);
-          aes128ctr (key, iv, input, 0x40, output);
-          if (memcmp (expected, output, 0x40) == 0) {
-            printf ("\nFound the key for method %s %d\n",
-                type < 4 ? "sc_encrypt_with_portability" : "sc_encrypt", type);
-            printf ("aes128ctr key:\n");
-            hex_dump (data + j, 0x10);
-/*
-            printf ("expected:\n");
-            hex_dump (expected, 0x40);
-            printf ("output:\n");
-            hex_dump (output, 0x40);
-*/
-            printf ("\n");
-            break;
-          }
-
-          memset (output, 0, 0x40);
-          memset (input, 0, 0x40);
-          memset (key, 0, 0x40);
-          memset (iv, 0, 0x10);
-          memcpy (key, data + j, 0x40);
-          //aes128cfb (data + j, iv, input, 0x40, output);
-          aes128cfb (key, iv, input, 0x40, output);
-          if (memcmp (expected, output, 0x40) == 0) {
-            printf ("\nFound the key for method %s %d\n",
-                type < 4 ? "sc_encrypt_with_portability" : "sc_encrypt", type);
-            printf ("aes128cfb key:\n");
-            hex_dump (data + j, 0x10);
-/*
-            printf ("expected:\n");
-            hex_dump (expected, 0x40);
-            printf ("output:\n");
-            hex_dump (output, 0x40);
-*/
-            printf ("\n");
-            break;
-          }
-
-          memset (output, 0, 0x40);
-          memset (input, 0, 0x40);
-          memset (key, 0, 0x40);
-          memset (iv, 0, 0x10);
-          memcpy (key, data + j, 0x40);
-          //aes128cbc_enc (data + j, iv, input, 0x40, output);
-          aes128cbc_enc (key, iv, input, 0x40, output);
-          if (memcmp (expected, output, 0x40) == 0) {
-            printf ("\nFound the key for method %s %d\n",
-                type < 4 ? "sc_encrypt_with_portability" : "sc_encrypt", type);
-            printf ("aes128cbc_enc key:\n");
-            hex_dump (data + j, 0x10);
-/*
-            printf ("expected:\n");
-            hex_dump (expected, 0x40);
-            printf ("output:\n");
-            hex_dump (output, 0x40);
-*/
-            printf ("\n");
-            break;
-          }
-        }
-        printf("\n");
-        free (data);
+      i++;
+      if (strlen (argv[i]) != 128)
+        die ("Encrypted Device ID must be 64 bytes and in hex format\n");
+      for (j = 0; j < 128; j += 2) {
+        char tmp[3] = {0};
+        memcpy (tmp, argv[i] + j, 2);
+        if (sscanf (tmp, "%X", encrypted_device_id + (j/2) ) != 1)
+          die ("Encrypted Device ID must be in hex format\n");
       }
+      encrypted_device_id_set = TRUE;
+      printf ("Encrypted Device ID set to : ");
+      print_hash (encrypted_device_id, 64);
+      printf ("\n");
     } else {
       die (USAGE_STRING "Error: Unknown command\n", argv[0]);
     }

@@ -142,6 +142,37 @@ void aes256cbc_enc(u8 *key, u8 *iv, u8 *in, u64 len, u8 *out)
 	}
 }
 
+void aes128cfb_enc(u8 *key, u8 *iv_in, u8 *in, u64 len, u8 *out)
+{
+	AES_KEY k;
+	u32 i;
+	u8 tmp[16];
+	u8 iv[16];
+
+	memcpy(iv, iv_in, 16);
+	memset(&k, 0, sizeof k);
+	AES_set_encrypt_key(key, 128, &k);
+
+	while (len > 0) {
+		memcpy(tmp, in, 16);
+		AES_encrypt(iv, out, &k);
+
+		for (i = 0; i < 16; i++)
+			out[i] ^= tmp[i];
+
+		memcpy(iv, out, 16);
+
+                if (len >= 16) {
+                  out += 16;
+                  in += 16;
+                  len -= 16;
+                } else {
+                  len = 0;
+                }
+
+	}
+}
+
 void aes128cfb(u8 *key, u8 *iv_in, u8 *in, u64 len, u8 *out)
 {
 	AES_KEY k;

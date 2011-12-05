@@ -34,6 +34,7 @@ void get_rand(u8 *bfr, u32 size);
 void aes256cbc(u8 *key, u8 *iv, u8 *in, u64 len, u8 *out);
 void aes256cbc_enc(u8 *key, u8 *iv, u8 *in, u64 len, u8 *out);
 void aes128ctr(u8 *key, u8 *iv, u8 *in, u64 len, u8 *out);
+void aes128cfb_enc(u8 *key, u8 *iv, u8 *in, u64 len, u8 *out);
 void aes128cfb(u8 *key, u8 *iv_in, u8 *in, u64 len, u8 *out);
 void aes128cbc(u8 *key, u8 *iv_in, u8 *in, u64 len, u8 *out);
 void aes128cbc_enc(u8 *key, u8 *iv, u8 *in, u64 len, u8 *out);
