@@ -35,7 +35,7 @@
 #define USAGE_STRING "PS3xport v" PS3XPORT_VERSION "\n"                 \
   "  Usage: %s command [argument ...] [command ...]\n"                  \
   "    Commands : \n"                                                   \
-  "\t  SetDeviceID HEX: Set the DeviceID needed for decrypting archive2.dat\n" \
+  "\t  SetDeviceID (HEX|filename): Set the DeviceID needed for decrypting archive2.dat\n" \
   "\t  ReadIndex archive.dat: Parse the index file and print info\n"        \
   "\t  ReadData archive_XX.dat: Parse a data file and print info\n"        \
   "\t  Decrypt archive[_XX].dat output: Decrypt the given file\n"       \
@@ -1076,13 +1076,23 @@ main (int argc, char *argv[])
       if (i + 1 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
       i++;
-      if (strlen (argv[i]) != 32)
-        die ("Device ID must be 16 bytes and in hex format\n");
-      for (j = 0; j < 32; j += 2) {
-        char tmp[3] = {0};
-        memcpy (tmp, argv[i] + j, 2);
-        if (sscanf (tmp, "%X", device_id + (j/2) ) != 1)
-          die ("Device ID must be in hex format\n");
+      if (file_exists (argv[i])) {
+        FILE *f = fopen (argv[i], "rb");
+        if (fread (device_id, 0x10, 1, f) != 1)
+          die ("Unable to read DeviceID from file\n");
+        fseek (f, 0, SEEK_END);
+        if (ftell (f) != 16)
+          die ("IDP file must be exactly 16 bytes\n");
+        fclose (f);
+      } else {
+        if (strlen (argv[i]) != 32)
+          die ("Device ID must be 16 bytes and in hex format\n");
+        for (j = 0; j < 32; j += 2) {
+          char tmp[3] = {0};
+          memcpy (tmp, argv[i] + j, 2);
+          if (sscanf (tmp, "%X", device_id + (j/2) ) != 1)
+            die ("Device ID must be in hex format\n");
+        }
       }
       device_id_set = TRUE;
       printf ("Device ID set to : ");
