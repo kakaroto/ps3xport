@@ -36,7 +36,6 @@
   "  Usage: %s command [argument ...] [command ...]\n"                  \
   "    Commands : \n"                                                   \
   "\t  SetDeviceID HEX: Set the DeviceID needed for decrypting archive2.dat\n" \
-  "\t  SetEncryptedDeviceID HEX: Set the Encrypted DeviceID needed for decrypting archive2.dat\n" \
   "\t  ReadIndex archive.dat: Parse the index file and print info\n"        \
   "\t  ReadData archive_XX.dat: Parse a data file and print info\n"        \
   "\t  Decrypt archive[_XX].dat output: Decrypt the given file\n"       \
@@ -129,8 +128,6 @@ typedef struct {
 
 static u8 device_id[0x10];
 static int device_id_set;
-static u8 encrypted_device_id[0x40];
-static int encrypted_device_id_set;
 
 static ChainedList *
 chained_list_append (ChainedList *list, void *data)
@@ -291,14 +288,10 @@ archive_gen_keys (ArchiveHeader *header, u8 *key, u8 *iv, u8 *hmac)
   memset (buffer, 0, 0x40);
   memset (zero_iv, 0, 0x10);
   if (header->size == 0x30) {
-    if (encrypted_device_id_set) {
-      memcpy (buffer, encrypted_device_id, 0x40);
-    } else {
-      if (!device_id_set)
-        die ("Device ID is not set. You must set it with the command SetDeviceID\n");
-      memcpy (buffer, device_id, 0x10);
-      vtrm_encrypt (3, buffer, zero_iv);
-    }
+    if (!device_id_set)
+      die ("Device ID is not set. You must set it with the command SetDeviceID\n");
+    memcpy (buffer, device_id, 0x10);
+    vtrm_encrypt (3, buffer, zero_iv);
   } else {
     memcpy (buffer, header->key_seed, 0x14);
     vtrm_encrypt_with_portability (1, buffer, zero_iv);
@@ -1094,24 +1087,6 @@ main (int argc, char *argv[])
       device_id_set = TRUE;
       printf ("Device ID set to : ");
       print_hash (device_id, 16);
-      printf ("\n");
-    } else if (strcmp (argv[i], "SetEncryptedDeviceID") == 0) {
-      int j;
-
-      if (i + 1 >= argc)
-        die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
-      i++;
-      if (strlen (argv[i]) != 128)
-        die ("Encrypted Device ID must be 64 bytes and in hex format\n");
-      for (j = 0; j < 128; j += 2) {
-        char tmp[3] = {0};
-        memcpy (tmp, argv[i] + j, 2);
-        if (sscanf (tmp, "%X", encrypted_device_id + (j/2) ) != 1)
-          die ("Encrypted Device ID must be in hex format\n");
-      }
-      encrypted_device_id_set = TRUE;
-      printf ("Encrypted Device ID set to : ");
-      print_hash (encrypted_device_id, 64);
       printf ("\n");
     } else {
       die (USAGE_STRING "Error: Unknown command\n", argv[0]);
