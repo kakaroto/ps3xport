@@ -180,40 +180,106 @@ generate_random_key_seed (u8 *seed)
   get_rand (seed, 0x14);
 }
 
+static void sc_encrypt (u32 type, u8 *laid_paid, u8 *iv, u8 *in, u32 in_size, u8 *out);
+
 static void
-sc_encrypt_with_portability (int type, u8 *buffer, u8 *iv)
+vtrm_encrypt_with_portability (u32 type, u8 *buffer, u8 *iv)
 {
-  static u8 keys[][16] = {
-    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-    {0xFA, 0x72, 0xCE, 0xEF, 0x59, 0xB4, 0xD2, 0x98,
-     0x9F, 0x11, 0x19, 0x13, 0x28, 0x7F, 0x51, 0xC7},
-    {0xD4, 0x13, 0xB8, 0x96, 0x63, 0xE1, 0xFE, 0x9F,
-     0x75, 0x14, 0x3D, 0x3B, 0xB4, 0x56, 0x52, 0x74},
-    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-  };
+  u32 real_type;
+  u8 laid_paid[16] = {0};
 
   switch ( type )
   {
     case 0:
+      real_type = 1;
+      break;
     case 3:
-      die ("sc_encrypt_with_portability method 0 and 3 have unknown keys");
+      real_type = 5;
       break;
     case 1:
+      real_type = 3;
+      break;
     case 2:
-      aes128cbc_enc (keys[type], iv, buffer, 0x40, buffer);
+      real_type = 2;
       break;
     default:
-      die ("sc_encrypt_with_portability Unknown method");
+      die ("vtrm_encrypt_with_portability Unknown method\n");
       break;
   }
+  sc_encrypt (real_type, laid_paid, iv, buffer, 0x40, buffer);
 }
 
 static void
-sc_encrypt (int type, u8 *buffer, u8 *iv)
+vtrm_encrypt (u32 type, u8 *buffer, u8 *iv)
 {
-  die ("sc_encrypt not yet supported");
+  u64 laid_paid[2];
+
+  switch ( type )
+  {
+    case 0:
+      laid_paid[1] = -1;
+      break;
+    case 1:
+      laid_paid[0] = TO_BE (64, 0x1070000002000001);
+      laid_paid[1] = TO_BE (64, 0x1070000000000001);
+      break;
+    case 2:
+      laid_paid[0] = laid_paid[1] = 0;
+    case 3:
+      laid_paid[0] = TO_BE (64, 0x1070000002000001);
+      laid_paid[1] = TO_BE (64, 0x10700003FF000001);
+      break;
+    default:
+      die ("vtrm_encrypt Unknown method\n");
+      break;
+  }
+  sc_encrypt (3, (u8 *)laid_paid, iv, buffer, 0x40, buffer);
+}
+
+static void
+sc_encrypt (u32 type, u8 *laid_paid, u8 *iv, u8 *in, u32 in_size, u8 *out)
+{
+  static const u8 keys[][16] = {
+    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+    {0xD4, 0x13, 0xB8, 0x96, 0x63, 0xE1, 0xFE, 0x9F,
+     0x75, 0x14, 0x3D, 0x3B, 0xB4, 0x56, 0x52, 0x74},
+    {0xFA, 0x72, 0xCE, 0xEF, 0x59, 0xB4, 0xD2, 0x98,
+     0x9F, 0x11, 0x19, 0x13, 0x28, 0x7F, 0x51, 0xC7},
+    {0xDA, 0xA4, 0xB9, 0xF2, 0xBC, 0x70, 0xB2, 0x80,
+     0xA7, 0xB3, 0x40, 0xFA, 0x0D, 0x04, 0xBA, 0x14},
+    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
+  };
+  u8 key[16];
+  int i;
+
+  if (type > 5)
+    die ("sc_encrypt: Invalid key type\n");
+
+  memcpy (key, keys[type], 16);
+  for (i = 0; i < 16; i++)
+    key[i] ^= laid_paid[i];
+
+  switch ( type )
+  {
+    case 0:
+      die ("sc_encrypt invalid key type\n");
+      break;
+    case 1:
+    case 5:
+      die ("vtrm_encrypt method 1 and 5 have unknown keys\n");
+      break;
+    case 2:
+    case 3:
+    case 4:
+      aes128cbc_enc (key, iv, in, in_size, out);
+      break;
+    default:
+      break;
+  }
 }
 
 static int
@@ -231,11 +297,11 @@ archive_gen_keys (ArchiveHeader *header, u8 *key, u8 *iv, u8 *hmac)
       if (!device_id_set)
         die ("Device ID is not set. You must set it with the command SetDeviceID\n");
       memcpy (buffer, device_id, 0x10);
-      sc_encrypt (3, buffer, zero_iv);
+      vtrm_encrypt (3, buffer, zero_iv);
     }
   } else {
     memcpy (buffer, header->key_seed, 0x14);
-    sc_encrypt_with_portability (1, buffer, zero_iv);
+    vtrm_encrypt_with_portability (1, buffer, zero_iv);
   }
   memcpy (key, buffer, 0x10);
   memcpy (iv, buffer + 0x10, 0x10);
