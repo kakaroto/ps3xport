@@ -23,7 +23,7 @@ ERROR_CFLAGS = \
 AM_CFLAGS = \
 	$(ERROR_CFLAGS)
 
-bin_PROGRAMS = 	ps3xport tst_sc_encrypt
+bin_PROGRAMS = 	ps3xport
 
 ps3xport_SOURCES =  types.h \
 		tools.c \
@@ -34,12 +34,3 @@ ps3xport_SOURCES =  types.h \
 		sha1.h \
 		ps3xport.c \
 		paged_file.c
-
-tst_sc_encrypt_SOURCES =  types.h \
-		tools.c \
-		tools.h \
-		aes.c \
-		aes.h \
-		sha1.c \
-		sha1.h \
-		tst_sc_encrypt.c
