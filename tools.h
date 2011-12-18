@@ -48,6 +48,7 @@ void hex_dump(void *data, int size);
 
 int file_exists (const char *path);
 int mkdir_recursive (const char *path);
+int parse_hex (const char *str, u8 *buffer, u32 size);
 
 #define		round_up(x,n)	(-(-(x) & -(n)))
 

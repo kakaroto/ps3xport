@@ -482,3 +482,34 @@ int mkdir_recursive (const char *path)
   free (temp);
   return ret;
 }
+
+static int hex_to_int (char c)
+{
+  if (c >= '0' && c <= '9')
+    return c - '0';
+  else if (c >= 'a' && c <= 'f')
+    return c - 'a' + 10;
+  else if (c >= 'A' && c <= 'F')
+    return c - 'A' + 10;
+  else
+    return -1;
+}
+
+int parse_hex (const char *str, u8 *buffer, u32 size)
+{
+  u32 len = strlen (str);
+  u32 i;
+
+  if (len > (size * 2))
+    return -1;
+  for (i = 0; i < size; i++) {
+    int left = hex_to_int (str[i*2]);
+    int right = hex_to_int (str[i*2 + 1]);
+
+    if (left == -1 || right == -1)
+      break;
+    buffer[i] = left << 4 | right;
+  }
+
+  return i;
+}

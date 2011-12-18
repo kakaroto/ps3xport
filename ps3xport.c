@@ -1072,12 +1072,8 @@ main (int argc, char *argv[])
       } else {
         if (strlen (argv[i]) != 32)
           die ("Device ID must be 16 bytes and in hex format\n");
-        for (j = 0; j < 32; j += 2) {
-          char tmp[3] = {0};
-          memcpy (tmp, argv[i] + j, 2);
-          if (sscanf (tmp, "%X", device_id + (j/2) ) != 1)
-            die ("Device ID must be in hex format\n");
-        }
+        if (parse_hex (argv[i], device_id, 16) != 16)
+          die ("Device ID must be in hex format\n");
       }
       device_id_set = TRUE;
       printf ("Device ID set to : ");
