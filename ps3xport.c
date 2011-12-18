@@ -1016,20 +1016,24 @@ main (int argc, char *argv[])
       i++;
       if (!index_archive_read (&archive_index, argv[i]))
         die ("Error parsing archive index!\n");
-      printf ("Backup id : ");
-      print_hash ((u8 *) &archive_index.header.id, 8);
-      if (archive_index.header.archive_type == 5) {
-        printf ("\nTotal filesize of the copy-protected content : %llu", archive_index.footer.archive2_size);
-        printf ("\nYour Open PSID : ");
-        print_hash (archive_index.footer.psid, 16);
-      }
-      printf ("\nTotal directories : %llu\n", archive_index.total_dirs);
+      printf ("Files : \n");
       chained_list_foreach (archive_index.dirs,
           (ChainedListForeachCallback) archive_print_dir, (void *) "    ");
-      printf ("\nTotal files : %llu\n", archive_index.total_files);
+      printf ("Directories : \n");
+      printf ("   |\n");
       chained_list_foreach (archive_index.files,
-          (ChainedListForeachCallback) archive_print_file, (void *) "    ");
-      printf ("\nTotal archive size : %llu bytes\n", archive_index.total_file_sizes);
+          (ChainedListForeachCallback) archive_print_file, (void *) "   |_ ");
+      printf ("Backup id : ");
+      print_hash ((u8 *) &archive_index.header.id, 8);
+      printf ("\nTotal files : %llu\n", archive_index.total_files);
+      printf ("Total directories : %llu\n", archive_index.total_dirs);
+      printf ("Total archive size : %llu bytes\n", archive_index.total_file_sizes);
+      if (archive_index.header.archive_type == 5) {
+        printf ("Your Open PSID : ");
+        print_hash (archive_index.footer.psid, 16);
+        printf ("\nTotal filesize of the copy-protected content : %llu bytes\n",
+            archive_index.footer.archive2_size);
+      }
     } else if (strcmp (argv[i], "ReadData") == 0) {
       ArchiveData archive_data;
 
