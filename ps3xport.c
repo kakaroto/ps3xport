@@ -212,19 +212,18 @@ vtrm_encrypt (u32 type, u8 *buffer, u8 *iv)
 {
   u64 laid_paid[2];
 
+  laid_paid[0] = TO_BE (64, 0x1070000002000001ULL);
   switch ( type )
   {
     case 0:
-      laid_paid[1] = -1;
+      laid_paid[0] = laid_paid[1] = -1;
       break;
     case 1:
-      laid_paid[0] = TO_BE (64, 0x1070000002000001ULL);
       laid_paid[1] = TO_BE (64, 0x1070000000000001ULL);
       break;
     case 2:
-      laid_paid[0] = laid_paid[1] = 0;
+      laid_paid[1] = 0;
     case 3:
-      laid_paid[0] = TO_BE (64, 0x1070000002000001ULL);
       laid_paid[1] = TO_BE (64, 0x10700003FF000001ULL);
       break;
     default:
