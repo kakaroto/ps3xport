@@ -108,8 +108,8 @@ typedef struct {
 typedef struct {
   u64 id;
   u32 index;
-  u8 unknown1; // 4 for copy protected, 5 for normal.
-  u8 unknown2; // 1 means the archive_id is the current ticks ? 0 means system time ?
+  u8 archive_type; // 4 for copy protected, 5 for normal.
+  u8 id_type; // 1 means the archive_id is the current ticks ? 0 means system time ?
   u16 padding;
 } ArchiveEncryptedHeader;
 
@@ -466,7 +466,7 @@ index_archive_read (IndexArchive *archive, const char *path)
     DBG ("Directory : %s\n", archive_dir->path);
   }
 
-  if (header2.unknown1 == 5) {
+  if (header2.archive_type == 5) {
     if (paged_file_read (&file, &footer, sizeof(footer)) != sizeof(footer)) {
       DBG ("Couldn't read footer\n");
       goto end;
@@ -531,8 +531,8 @@ index_archive_write (IndexArchive *archive, const char *path)
 
   header2.id = archive->id;
   header2.index = 0;
-  header2.unknown1 = 5;
-  header2.unknown2 = 1;
+  header2.archive_type = 5;
+  header2.id_type = 1;
   header2.padding = 0;
   if (paged_file_write (&file, &header2, sizeof(header2)) != sizeof(header2)) {
     DBG ("Couldn't write encrypted header\n");
@@ -593,7 +593,7 @@ index_archive_write (IndexArchive *archive, const char *path)
     goto end;
   }
 
-  if (header2.unknown1 == 5) {
+  if (header2.archive_type == 5) {
     memcpy (footer.psid, archive->psid, 0x10);
     footer.archive2_size = TO_BE (64, archive->archive2_size);
     footer.zero = 0;
@@ -642,8 +642,8 @@ data_archive_read (DataArchive *archive, const char *path)
   header2.index = FROM_BE (32, header2.index);
   archive->id = header2.id;
   archive->index = header2.index;
-  archive->type = header2.unknown1;
-  archive->id_type = header2.unknown2;
+  archive->type = header2.archive_type;
+  archive->id_type = header2.id_type;
 
   do {
     u8 buffer[1024];
@@ -919,8 +919,8 @@ archive_add (const char *path, const char *game)
 
     header2.id = archive.id;
     header2.index = TO_BE (32, index);
-    header2.unknown1 = 5;
-    header2.unknown2 = 0;
+    header2.archive_type = 5;
+    header2.id_type = 0;
 
     snprintf (buffer, sizeof(buffer), "%s/archive_%02d.dat", path, index);
 
