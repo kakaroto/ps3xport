@@ -5,6 +5,7 @@
 #include "tools.h"
 #include "types.h"
 #include "common.h"
+#include "keys.h"
 
 #include "paged_file.h"
 
@@ -35,6 +36,7 @@
 #define USAGE_STRING "PS3xport v" PS3XPORT_VERSION "\n"                 \
   "  Usage: %s command [argument ...] [command ...]\n"                  \
   "    Commands : \n"                                                   \
+  "\t  SetKeysFile filename: Set the keys.conf file path (default: keys.conf)\n" \
   "\t  SetDeviceID (HEX|filename): Set the DeviceID needed for decrypting archive2.dat\n" \
   "\t  ReadIndex archive.dat: Parse the index file and print info\n"        \
   "\t  ReadData archive_XX.dat: Parse a data file and print info\n"        \
@@ -124,6 +126,9 @@ typedef struct {
 
 static u8 device_id[0x10];
 static int device_id_set;
+static const char *keys_conf_path = "keys.conf";
+static Key *keys;
+static int num_keys;
 
 static ChainedList *
 chained_list_append (ChainedList *list, void *data)
@@ -232,47 +237,27 @@ vtrm_encrypt (u32 type, u8 *buffer, u8 *iv)
 static void
 sc_encrypt (u32 type, u8 *laid_paid, u8 *iv, u8 *in, u32 in_size, u8 *out)
 {
-  static const u8 keys[][16] = {
-    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-    {0xD4, 0x13, 0xB8, 0x96, 0x63, 0xE1, 0xFE, 0x9F,
-     0x75, 0x14, 0x3D, 0x3B, 0xB4, 0x56, 0x52, 0x74},
-    {0xFA, 0x72, 0xCE, 0xEF, 0x59, 0xB4, 0xD2, 0x98,
-     0x9F, 0x11, 0x19, 0x13, 0x28, 0x7F, 0x51, 0xC7},
-    {0xDA, 0xA4, 0xB9, 0xF2, 0xBC, 0x70, 0xB2, 0x80,
-     0xA7, 0xB3, 0x40, 0xFA, 0x0D, 0x04, 0xBA, 0x14},
-    {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00},
-  };
+  Key *sc_key;
   u8 key[16];
   int i;
 
   if (type > 5)
     die ("sc_encrypt: Invalid key type\n");
 
-  memcpy (key, keys[type], 16);
+  if (keys == NULL) {
+    keys = keys_load_from_file (keys_conf_path, &num_keys);
+    if (keys == NULL)
+      die ("Unable to load necessary keys\n");
+  }
+
+  sc_key = keys_find_by_revision (keys, num_keys, KEY_TYPE_SC, type);
+  if (sc_key == NULL)
+      die ("sc_encrypt: Unknown key\n");
+
+  memcpy (key, sc_key->key, 16);
   for (i = 0; i < 16; i++)
     key[i] ^= laid_paid[i];
-
-  switch ( type )
-  {
-    case 0:
-      die ("sc_encrypt invalid key type\n");
-      break;
-    case 1:
-    case 5:
-      die ("vtrm_encrypt method 1 and 5 have unknown keys\n");
-      break;
-    case 2:
-    case 3:
-    case 4:
-      aes128cbc_enc (key, iv, in, in_size, out);
-      break;
-    default:
-      break;
-  }
+  aes128cbc_enc (key, iv, in, in_size, out);
 }
 
 static int
@@ -1002,7 +987,11 @@ main (int argc, char *argv[])
     die (USAGE_STRING, argv[0]);
 
   for (i = 1; i < argc; i++) {
-    if (strcmp (argv[i], "Decrypt") == 0) {
+    if (strcmp (argv[i], "SetKeysPath") == 0) {
+      if (i + 1 >= argc)
+        die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
+      keys_conf_path = argv[++i];
+    } else if (strcmp (argv[i], "Decrypt") == 0) {
       if (i + 2 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
       if (!archive_decrypt (argv[i+1], argv[i+2]))
