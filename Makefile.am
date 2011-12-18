@@ -28,6 +28,8 @@ bin_PROGRAMS = 	ps3xport
 ps3xport_SOURCES =  types.h \
 		tools.c \
 		tools.h \
+		keys.c \
+		keys.h \
 		aes.c \
 		aes.h \
 		sha1.c \
