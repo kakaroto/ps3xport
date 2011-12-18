@@ -127,8 +127,8 @@ typedef struct {
 static u8 device_id[0x10];
 static int device_id_set;
 static const char *keys_conf_path = "keys.conf";
-static Key *keys;
-static int num_keys;
+static Key *keys = NULL;
+static int num_keys = 0;
 
 static ChainedList *
 chained_list_append (ChainedList *list, void *data)
@@ -1076,6 +1076,7 @@ main (int argc, char *argv[])
     }
   }
 
+  keys_free (keys, num_keys);
   return 0;
 }
 
