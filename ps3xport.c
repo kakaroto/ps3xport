@@ -87,23 +87,12 @@ typedef struct {
 } ArchiveDirectory;
 
 typedef struct {
-  u64 id; // system time in usec or current ticks
-  u64 archive2_size; // total_filesize of the other archive index
-  u8 psid[0x10];
-  ChainedList *files;
-  u64 total_files;
-  u64 total_file_sizes;
-  ChainedList *dirs;
-  u64 total_dirs;
-} IndexArchive;
-
-typedef struct {
   u32 size;
   u32 type;
   u8 hash[0x14];
   u8 key_seed[0x14];
   u8 padding[0x10];
-} ArchiveHeader;
+} DatFileHeader;
 
 typedef struct {
   u64 id;
@@ -111,20 +100,27 @@ typedef struct {
   u8 archive_type; // 4 for copy protected, 5 for normal.
   u8 id_type; // 1 means the archive_id is the current ticks ? 0 means system time ?
   u16 padding;
-} ArchiveEncryptedHeader;
+} ArchiveHeader;
 
 typedef struct {
   u8 psid[0x10];
   u64 archive2_size;
-  u64 zero;
-} IndexArchiveFooter;
+  u64 padding;
+} ArchiveIndexFooter;
 
 typedef struct {
-  u64 id;
-  u8 id_type;
-  u8 type;
-  u32 index;
-} DataArchive;
+  ArchiveHeader header;
+  ArchiveIndexFooter footer;
+  ChainedList *files;
+  u64 total_files;
+  u64 total_file_sizes;
+  ChainedList *dirs;
+  u64 total_dirs;
+} ArchiveIndex;
+
+typedef struct {
+  ArchiveHeader header;
+} ArchiveData;
 
 static u8 device_id[0x10];
 static int device_id_set;
@@ -217,14 +213,14 @@ vtrm_encrypt (u32 type, u8 *buffer, u8 *iv)
       laid_paid[1] = -1;
       break;
     case 1:
-      laid_paid[0] = TO_BE (64, 0x1070000002000001);
-      laid_paid[1] = TO_BE (64, 0x1070000000000001);
+      laid_paid[0] = TO_BE (64, 0x1070000002000001ULL);
+      laid_paid[1] = TO_BE (64, 0x1070000000000001ULL);
       break;
     case 2:
       laid_paid[0] = laid_paid[1] = 0;
     case 3:
-      laid_paid[0] = TO_BE (64, 0x1070000002000001);
-      laid_paid[1] = TO_BE (64, 0x10700003FF000001);
+      laid_paid[0] = TO_BE (64, 0x1070000002000001ULL);
+      laid_paid[1] = TO_BE (64, 0x10700003FF000001ULL);
       break;
     default:
       die ("vtrm_encrypt Unknown method\n");
@@ -280,7 +276,7 @@ sc_encrypt (u32 type, u8 *laid_paid, u8 *iv, u8 *in, u32 in_size, u8 *out)
 }
 
 static int
-archive_gen_keys (ArchiveHeader *header, u8 *key, u8 *iv, u8 *hmac)
+archive_gen_keys (DatFileHeader *header, u8 *key, u8 *iv, u8 *hmac)
 {
   u8 buffer[0x40];
   u8 zero_iv[0x10];
@@ -305,7 +301,7 @@ archive_gen_keys (ArchiveHeader *header, u8 *key, u8 *iv, u8 *hmac)
 }
 
 static int
-archive_open (const char *path, PagedFile *file, ArchiveHeader *header)
+archive_open (const char *path, PagedFile *file, DatFileHeader *dat_header)
 {
   u8 key[0x10];
   u8 iv[0x10];
@@ -317,25 +313,25 @@ archive_open (const char *path, PagedFile *file, ArchiveHeader *header)
     goto end;
   }
 
-  if (paged_file_read (file, header, sizeof(ArchiveHeader)) != sizeof(ArchiveHeader)) {
-    DBG ("Couldn't read file header\n");
+  if (paged_file_read (file, dat_header, sizeof(DatFileHeader)) != sizeof(DatFileHeader)) {
+    DBG ("Couldn't read dat file header\n");
     goto end;
   }
 
-  header->size = FROM_LE (32, header->size);
-  header->type = FROM_BE (32, header->type);
+  dat_header->size = FROM_LE (32, dat_header->size);
+  dat_header->type = FROM_BE (32, dat_header->type);
 
-  if (header->size != 0x40 && header->size != 0x30) {
-    DBG ("Invalid header size : %X\n", header->size);
+  if (dat_header->size != 0x40 && dat_header->size != 0x30) {
+    DBG ("Invalid dat header size : %X\n", dat_header->size);
     goto end;
   }
 
-  if (header->type != 5) {
-    DBG ("Header type must be 5, not : %X\n", header->type);
+  if (dat_header->type != 5) {
+    DBG ("Header type must be 5, not : %X\n", dat_header->type);
     goto end;
   }
 
-  if (!archive_gen_keys (header, key, iv, hmac)) {
+  if (!archive_gen_keys (dat_header, key, iv, hmac)) {
     DBG ("Error generating keys\n");
     goto end;
   }
@@ -353,12 +349,12 @@ static int
 archive_decrypt (const char *path, const char *to)
 {
   FILE *fd = NULL;
-  ArchiveHeader header;
+  DatFileHeader dat_header;
   PagedFile file = {0};
   int read;
   int ret = FALSE;
 
-  if (!archive_open (path, &file, &header)) {
+  if (!archive_open (path, &file, &dat_header)) {
     DBG ("Couldn't open file %s\n", path);
     goto end;
   }
@@ -369,9 +365,9 @@ archive_decrypt (const char *path, const char *to)
     goto end;
   }
 
-  header.size = TO_LE (32, header.size);
-  header.type = TO_BE (32, header.type);
-  fwrite (&header, sizeof(header), 1, fd);
+  dat_header.size = TO_LE (32, dat_header.size);
+  dat_header.type = TO_BE (32, dat_header.type);
+  fwrite (&dat_header, sizeof(dat_header), 1, fd);
 
   do {
     u8 buffer[1024];
@@ -387,7 +383,7 @@ archive_decrypt (const char *path, const char *to)
 
   paged_file_close (&file);
 
-  if (ret && memcmp (header.hash, file.digest, 0x14) != 0) {
+  if (ret && memcmp (dat_header.hash, file.digest, 0x14) != 0) {
     DBG ("HMAC hash does not match\n");
     ret = FALSE;
   }
@@ -395,28 +391,25 @@ archive_decrypt (const char *path, const char *to)
 }
 
 static int
-index_archive_read (IndexArchive *archive, const char *path)
+index_archive_read (ArchiveIndex *archive_index, const char *path)
 {
   PagedFile file = {0};
-  ArchiveHeader header;
-  ArchiveEncryptedHeader header2;
-  IndexArchiveFooter footer;
+  DatFileHeader dat_header;
 
-  archive->id = archive->archive2_size = 0;
-  archive->files = archive->dirs = NULL;
-  archive->total_files = archive->total_file_sizes = archive->total_dirs = 0;
+  archive_index->header.id = archive_index->footer.archive2_size = 0;
+  archive_index->files = archive_index->dirs = NULL;
+  archive_index->total_files = archive_index->total_file_sizes = archive_index->total_dirs = 0;
 
-  if (!archive_open (path, &file, &header)) {
+  if (!archive_open (path, &file, &dat_header)) {
     DBG ("Couldn't open file %s\n", path);
     goto end;
   }
 
-  if (paged_file_read (&file, &header2, sizeof(header2)) != sizeof(header2)) {
-    DBG ("Couldn't read encrypted header\n");
+  if (paged_file_read (&file, &archive_index->header, sizeof(archive_index->header)) != sizeof(archive_index->header)) {
+    DBG ("Couldn't read archive encrypted header\n");
     goto end;
   }
-  header2.index = FROM_BE (32, header2.index);
-  archive->id = header2.id;
+  archive_index->header.index = FROM_BE (32, archive_index->header.index);
 
   while(1) {
     ArchiveFile *archive_file = malloc (sizeof(ArchiveFile));
@@ -425,8 +418,8 @@ index_archive_read (IndexArchive *archive, const char *path)
       goto end;
     }
     if (archive_file->eos.zero == 0) {
-      archive->total_files = FROM_BE (64, archive_file->eos.total_files);
-      archive->total_file_sizes = FROM_BE (64, archive_file->eos.total_file_sizes);
+      archive_index->total_files = FROM_BE (64, archive_file->eos.total_files);
+      archive_index->total_file_sizes = FROM_BE (64, archive_file->eos.total_file_sizes);
       free (archive_file);
       break;
     }
@@ -439,7 +432,7 @@ index_archive_read (IndexArchive *archive, const char *path)
     archive_file->stat.file_size = FROM_BE (64, archive_file->stat.file_size);
     archive_file->stat.block_size = FROM_BE (64, archive_file->stat.block_size);
     archive_file->flags = FROM_BE (32, archive_file->flags);
-    archive->files = chained_list_append (archive->files, archive_file);
+    archive_index->files = chained_list_append (archive_index->files, archive_file);
     DBG ("File : %s\n", archive_file->path);
   }
   while(1) {
@@ -449,7 +442,7 @@ index_archive_read (IndexArchive *archive, const char *path)
       goto end;
     }
     if (archive_dir->eos.zero == 0) {
-      archive->total_dirs = FROM_BE (64, archive_dir->eos.total_dirs);
+      archive_index->total_dirs = FROM_BE (64, archive_dir->eos.total_dirs);
       free (archive_dir);
       break;
     }
@@ -462,22 +455,21 @@ index_archive_read (IndexArchive *archive, const char *path)
     archive_dir->stat.file_size = FROM_BE (64, archive_dir->stat.file_size);
     archive_dir->stat.block_size = FROM_BE (64, archive_dir->stat.block_size);
     archive_dir->flags = FROM_BE (32, archive_dir->flags);
-    archive->dirs = chained_list_append (archive->dirs, archive_dir);
+    archive_index->dirs = chained_list_append (archive_index->dirs, archive_dir);
     DBG ("Directory : %s\n", archive_dir->path);
   }
 
-  if (header2.archive_type == 5) {
-    if (paged_file_read (&file, &footer, sizeof(footer)) != sizeof(footer)) {
-      DBG ("Couldn't read footer\n");
+  if (archive_index->header.archive_type == 5) {
+    if (paged_file_read (&file, &archive_index->footer, sizeof(archive_index->footer)) != sizeof(archive_index->footer)) {
+      DBG ("Couldn't read index archive footer\n");
       goto end;
     }
-    memcpy (archive->psid, footer.psid, 0x10);
-    archive->archive2_size = FROM_BE (64, footer.archive2_size);
+    archive_index->footer.archive2_size = FROM_BE (64, archive_index->footer.archive2_size);
   }
 
   paged_file_close (&file);
 
-  if (memcmp (header.hash, file.digest, 0x14) != 0) {
+  if (memcmp (dat_header.hash, file.digest, 0x14) != 0) {
     DBG ("HMAC hash does not match\n");
     return FALSE;
   }
@@ -491,13 +483,11 @@ index_archive_read (IndexArchive *archive, const char *path)
 
 
 static int
-index_archive_write (IndexArchive *archive, const char *path)
+index_archive_write (ArchiveIndex *archive_index, const char *path)
 {
   FILE *fd = NULL;
   PagedFile file = {0};
-  ArchiveHeader header;
-  ArchiveEncryptedHeader header2;
-  IndexArchiveFooter footer;
+  DatFileHeader dat_header;
   ArchiveFile file_eos = {0};
   ArchiveDirectory dir_eos = {0};
   ChainedList *list;
@@ -510,17 +500,17 @@ index_archive_write (IndexArchive *archive, const char *path)
     goto end;
   }
 
-  header.size = TO_LE (32, 0x40);
-  header.type = TO_BE (32, 0x05);
-  generate_random_key_seed (header.key_seed);
-  memset (header.padding, 0, 0x10);
+  dat_header.size = TO_LE (32, 0x40);
+  dat_header.type = TO_BE (32, 0x05);
+  generate_random_key_seed (dat_header.key_seed);
+  memset (dat_header.padding, 0, 0x10);
 
-  if (paged_file_write (&file, &header, sizeof(header)) != sizeof(header)) {
-    DBG ("Couldn't write file header\n");
+  if (paged_file_write (&file, &dat_header, sizeof(dat_header)) != sizeof(dat_header)) {
+    DBG ("Couldn't write file dat header\n");
     goto end;
   }
 
-  if (!archive_gen_keys (&header, key, iv, hmac)) {
+  if (!archive_gen_keys (&dat_header, key, iv, hmac)) {
     DBG ("Error generating keys\n");
     goto end;
   }
@@ -529,23 +519,22 @@ index_archive_write (IndexArchive *archive, const char *path)
   paged_file_hash (&file, hmac);
   paged_file_crypt (&file, key, iv);
 
-  header2.id = archive->id;
-  header2.index = 0;
-  header2.archive_type = 5;
-  header2.id_type = 1;
-  header2.padding = 0;
-  if (paged_file_write (&file, &header2, sizeof(header2)) != sizeof(header2)) {
-    DBG ("Couldn't write encrypted header\n");
+  archive_index->header.index = 0;
+  archive_index->header.archive_type = 5;
+  archive_index->header.id_type = 1;
+  archive_index->header.padding = 0;
+  if (paged_file_write (&file, &archive_index->header, sizeof(archive_index->header)) != sizeof(archive_index->header)) {
+    DBG ("Couldn't write archive index header\n");
     goto end;
   }
 
-  archive->total_files = 0;
-  archive->total_file_sizes = 0;
-  for (list = archive->files; list; list = list->next) {
+  archive_index->total_files = 0;
+  archive_index->total_file_sizes = 0;
+  for (list = archive_index->files; list; list = list->next) {
     ArchiveFile *archive_file = list->data;
 
-    archive->total_files++;
-    archive->total_file_sizes += archive_file->stat.file_size;
+    archive_index->total_files++;
+    archive_index->total_file_sizes += archive_file->stat.file_size;
     archive_file->stat.mode = TO_BE (32, archive_file->stat.mode);
     archive_file->stat.uid = TO_BE (32, archive_file->stat.uid);
     archive_file->stat.gid = TO_BE (32, archive_file->stat.gid);
@@ -561,17 +550,17 @@ index_archive_write (IndexArchive *archive, const char *path)
     }
   }
   file_eos.eos.zero = 0;
-  file_eos.eos.total_files = TO_BE (64, archive->total_files);
-  file_eos.eos.total_file_sizes = TO_BE (64, archive->total_file_sizes);
+  file_eos.eos.total_files = TO_BE (64, archive_index->total_files);
+  file_eos.eos.total_file_sizes = TO_BE (64, archive_index->total_file_sizes);
   if (paged_file_write (&file, &file_eos, sizeof(ArchiveFile)) != sizeof(ArchiveFile)) {
     DBG ("Couldn't write file EOS\n");
     goto end;
   }
-  archive->total_dirs = 0;
-  for (list = archive->dirs; list; list = list->next) {
+  archive_index->total_dirs = 0;
+  for (list = archive_index->dirs; list; list = list->next) {
     ArchiveDirectory *archive_dir = list->data;
 
-    archive->total_dirs++;
+    archive_index->total_dirs++;
     archive_dir->stat.mode = TO_BE (32, archive_dir->stat.mode);
     archive_dir->stat.uid = TO_BE (32, archive_dir->stat.uid);
     archive_dir->stat.gid = TO_BE (32, archive_dir->stat.gid);
@@ -587,18 +576,17 @@ index_archive_write (IndexArchive *archive, const char *path)
     }
   }
   dir_eos.eos.zero = 0;
-  dir_eos.eos.total_dirs = TO_BE (64, archive->total_dirs);
+  dir_eos.eos.total_dirs = TO_BE (64, archive_index->total_dirs);
   if (paged_file_write (&file, &dir_eos, sizeof(ArchiveDirectory)) != sizeof(ArchiveDirectory)) {
     DBG ("Couldn't write dir EOS\n");
     goto end;
   }
 
-  if (header2.archive_type == 5) {
-    memcpy (footer.psid, archive->psid, 0x10);
-    footer.archive2_size = TO_BE (64, archive->archive2_size);
-    footer.zero = 0;
-    if (paged_file_write (&file, &footer, sizeof(footer)) != sizeof(footer)) {
-      DBG ("Couldn't write footer\n");
+  if (archive_index->header.archive_type == 5) {
+    archive_index->footer.archive2_size = TO_BE (64, archive_index->footer.archive2_size);
+    archive_index->footer.padding = 0;
+    if (paged_file_write (&file, &archive_index->footer, sizeof(archive_index->footer)) != sizeof(archive_index->footer)) {
+      DBG ("Couldn't write archive index footer\n");
       goto end;
     }
   }
@@ -621,29 +609,24 @@ index_archive_write (IndexArchive *archive, const char *path)
 }
 
 static int
-data_archive_read (DataArchive *archive, const char *path)
+data_archive_read (ArchiveData *archive_data, const char *path)
 {
   PagedFile file = {0};
-  ArchiveHeader header;
-  ArchiveEncryptedHeader header2;
+  DatFileHeader dat_header;
   int read;
 
-  archive->id = archive->type = archive->index = 0;
+  archive_data->header.id = archive_data->header.index = archive_data->header.archive_type = archive_data->header.id_type = 0;
 
-  if (!archive_open (path, &file, &header)) {
+  if (!archive_open (path, &file, &dat_header)) {
     DBG ("Couldn't open file %s\n", path);
     goto end;
   }
 
-  if (paged_file_read (&file, &header2, sizeof(header2)) != sizeof(header2)) {
+  if (paged_file_read (&file, &archive_data, sizeof(archive_data)) != sizeof(archive_data)) {
     DBG ("Couldn't read encrypted header\n");
     goto end;
   }
-  header2.index = FROM_BE (32, header2.index);
-  archive->id = header2.id;
-  archive->index = header2.index;
-  archive->type = header2.archive_type;
-  archive->id_type = header2.id_type;
+  archive_data->header.index = FROM_BE (32, archive_data->header.index);
 
   do {
     u8 buffer[1024];
@@ -652,7 +635,7 @@ data_archive_read (DataArchive *archive, const char *path)
 
   paged_file_close (&file);
 
-  if (memcmp (header.hash, file.digest, 0x14) != 0) {
+  if (memcmp (dat_header.hash, file.digest, 0x14) != 0) {
     DBG ("HMAC hash does not match\n");
     return FALSE;
   }
@@ -669,18 +652,18 @@ archive_dump (const char *path, const char *output)
 {
   ChainedList *list = NULL;
   char buffer[0x10000];
-  IndexArchive archive;
-  ArchiveHeader header;
-  ArchiveEncryptedHeader header2;
+  ArchiveIndex archive_index;
+  DatFileHeader dat_header;
+  ArchiveHeader archive_header;
   PagedFile pf = {0};
   u32 index = 0;
   int open = FALSE;
 
   snprintf (buffer, sizeof(buffer), "%s/archive.dat", path);
-  if (!index_archive_read (&archive, buffer))
+  if (!index_archive_read (&archive_index, buffer))
     die ("Unable to read index archive\n");
 
-  for (list = archive.dirs; list; list = list->next) {
+  for (list = archive_index.dirs; list; list = list->next) {
     ArchiveDirectory *dir = list->data;
 
     snprintf (buffer, sizeof(buffer), "%s/%s", output, dir->path);
@@ -688,7 +671,7 @@ archive_dump (const char *path, const char *output)
       die ("Error making directories\n");
   }
 
-  for (list = archive.files; list; list = list->next) {
+  for (list = archive_index.files; list; list = list->next) {
     ArchiveFile *file = list->data;
     FILE *fd;
     u64 len = file->stat.file_size;
@@ -703,15 +686,15 @@ archive_dump (const char *path, const char *output)
 
       if (!open) {
         snprintf (buffer, sizeof(buffer), "%s/archive_%02d.dat", path, index);
-        if (!archive_open (buffer, &pf, &header)) {
+        if (!archive_open (buffer, &pf, &dat_header)) {
           die ("Couldn't open archive %d\n", index);
         }
 
-        if (paged_file_read (&pf, &header2, sizeof(header2)) != sizeof(header2))
-          die ("Couldn't read header\n");
-        if (header2.id != archive.id)
+        if (paged_file_read (&pf, &archive_header, sizeof(archive_header)) != sizeof(archive_header))
+          die ("Couldn't read archive header\n");
+        if (archive_header.id != archive_index.header.id)
           die ("Wrong archive ID\n");
-        if (FROM_BE (32, header2.index) != index)
+        if (FROM_BE (32, archive_header.index) != index)
           die ("Wrong archive index\n");
         index++;
         open = TRUE;
@@ -815,9 +798,9 @@ archive_add (const char *path, const char *game)
 {
   ChainedList *list = NULL;
   char buffer[0x10000];
-  IndexArchive archive;
-  ArchiveHeader header;
-  ArchiveEncryptedHeader header2;
+  ArchiveIndex archive_index;
+  DatFileHeader dat_header;
+  ArchiveHeader archive_header;
   ChainedList *dirs = NULL;
   ChainedList *files = NULL;
   PagedFile in = {0};
@@ -840,18 +823,18 @@ archive_add (const char *path, const char *game)
   closedir (dir_fd);
 
   snprintf (buffer, sizeof(buffer), "%s/archive.dat", path);
-  if (!index_archive_read (&archive, buffer))
+  if (!index_archive_read (&archive_index, buffer))
     die ("Unable to read index archive\n");
 
   for (list = dirs; list; list = list->next) {
     ArchiveDirectory *dir = list->data;
 
     if (strcmp (dir->path, "/dev_hdd0") == 0 ||
-        chained_list_contains_string (archive.dirs, dir->path)) {
+        chained_list_contains_string (archive_index.dirs, dir->path)) {
       free (dir);
       continue;
     }
-    archive.dirs = chained_list_append (archive.dirs, dir);
+    archive_index.dirs = chained_list_append (archive_index.dirs, dir);
   }
   chained_list_free (dirs);
 
@@ -869,36 +852,36 @@ archive_add (const char *path, const char *game)
 
   snprintf (buffer, sizeof(buffer), "%s/archive_%02d.dat", path, index);
   if (file_exists (buffer)) {
-    if (!archive_open (buffer, &in, &header))
+    if (!archive_open (buffer, &in, &dat_header))
       die ("Couldn't open archive %d\n", index);
 
-    if (paged_file_read (&in, &header2, sizeof(header2)) != sizeof(header2))
+    if (paged_file_read (&in, &archive_header, sizeof(archive_header)) != sizeof(archive_header))
       die ("Couldn't read header\n");
-    if (header2.id != archive.id)
+    if (archive_header.id != archive_index.header.id)
       die ("Wrong archive ID\n");
-    if (FROM_BE (32, header2.index) != index)
+    if (FROM_BE (32, archive_header.index) != index)
       die ("Wrong archive index\n");
     snprintf (buffer, sizeof(buffer), "%s/archive_%02d.tmp", path, index);
 
     if (!paged_file_open (&out, buffer, FALSE))
       die ("Couldn't open output archive %d\n", index);
 
-    header.size = TO_LE (32, header.size);
-    header.type = TO_BE (32, header.type);
-    if (paged_file_write (&out, &header, sizeof(header)) != sizeof(header))
-      die ("Couldn't write file header\n");
-    total_file_size += sizeof(header);
+    dat_header.size = TO_LE (32, dat_header.size);
+    dat_header.type = TO_BE (32, dat_header.type);
+    if (paged_file_write (&out, &dat_header, sizeof(dat_header)) != sizeof(dat_header))
+      die ("Couldn't write file dat header\n");
+    total_file_size += sizeof(dat_header);
 
-    if (!archive_gen_keys (&header, key, iv, hmac))
+    if (!archive_gen_keys (&dat_header, key, iv, hmac))
       die ("Error generating keys\n");
 
     paged_file_flush (&out);
     paged_file_hash (&out, hmac);
     paged_file_crypt (&out, key, iv);
 
-    if (paged_file_write (&out, &header2, sizeof(header2)) != sizeof(header2))
+    if (paged_file_write (&out, &archive_header, sizeof(archive_header)) != sizeof(archive_header))
       die ("Couldn't write encrypted header\n");
-    total_file_size += sizeof(header2);
+    total_file_size += sizeof(archive_header);
 
     while (1) {
       int read = paged_file_read (&in, buffer, sizeof(buffer));
@@ -912,42 +895,42 @@ archive_add (const char *path, const char *game)
     paged_file_close (&in);
     new_file = FALSE;
   } else {
-    header.size = TO_LE (32, 0x40);
-    header.type = TO_BE (32, 0x05);
-    generate_random_key_seed (header.key_seed);
-    memset (header.padding, 0, 0x10);
+    dat_header.size = TO_LE (32, 0x40);
+    dat_header.type = TO_BE (32, 0x05);
+    generate_random_key_seed (dat_header.key_seed);
+    memset (dat_header.padding, 0, 0x10);
 
-    header2.id = archive.id;
-    header2.index = TO_BE (32, index);
-    header2.archive_type = 5;
-    header2.id_type = 0;
+    archive_header.id = archive_index.header.id;
+    archive_header.index = TO_BE (32, index);
+    archive_header.archive_type = 5;
+    archive_header.id_type = 0;
 
     snprintf (buffer, sizeof(buffer), "%s/archive_%02d.dat", path, index);
 
     if (!paged_file_open (&out, buffer, FALSE))
       die ("Couldn't open output archive %d\n", index);
 
-    if (paged_file_write (&out, &header, sizeof(header)) != sizeof(header))
-      die ("Couldn't write file header\n");
-    total_file_size += sizeof(header);
+    if (paged_file_write (&out, &dat_header, sizeof(dat_header)) != sizeof(dat_header))
+      die ("Couldn't write file dat header\n");
+    total_file_size += sizeof(dat_header);
 
-    if (!archive_gen_keys (&header, key, iv, hmac))
+    if (!archive_gen_keys (&dat_header, key, iv, hmac))
       die ("Error generating keys\n");
 
     paged_file_flush (&out);
     paged_file_hash (&out, hmac);
     paged_file_crypt (&out, key, iv);
 
-    if (paged_file_write (&out, &header2, sizeof(header2)) != sizeof(header2))
+    if (paged_file_write (&out, &archive_header, sizeof(archive_header)) != sizeof(archive_header))
       die ("Couldn't write encrypted header\n");
-    total_file_size += sizeof(header2);
+    total_file_size += sizeof(archive_header);
     new_file = TRUE;
   }
 
   for (list = files; list; list = list->next) {
     ArchiveFile *file = list->data;
 
-    if (chained_list_contains_string (archive.files, file->path)) {
+    if (chained_list_contains_string (archive_index.files, file->path)) {
       free (file);
       continue;
     }
@@ -969,7 +952,7 @@ archive_add (const char *path, const char *game)
     }
 
     fclose (fd);
-    archive.files = chained_list_append (archive.files, file);
+    archive_index.files = chained_list_append (archive_index.files, file);
   }
   paged_file_flush (&out);
   fd = out.fd;
@@ -993,7 +976,7 @@ archive_add (const char *path, const char *game)
   snprintf (buffer + 0x500, 0x500, "%s/archive.bak", path);
   if (rename (buffer, buffer + 0x500) != 0)
     die ("File rename failed\n");
-  if (!index_archive_write (&archive, buffer))
+  if (!index_archive_write (&archive_index, buffer))
     die ("Unable to write index archive\n");
 
   return TRUE;
@@ -1026,38 +1009,40 @@ main (int argc, char *argv[])
         die ("Error decrypting archive!\n");
       i += 2;
     } else if (strcmp (argv[i], "ReadIndex") == 0) {
-      IndexArchive archive;
+      ArchiveIndex archive_index;
 
       if (i + 1 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
       i++;
-      if (!index_archive_read (&archive, argv[i]))
-        die ("Error parsing archive!\n");
+      if (!index_archive_read (&archive_index, argv[i]))
+        die ("Error parsing archive index!\n");
       printf ("Backup id : ");
-      print_hash ((u8 *) &archive.id, 8);
-      printf ("\nTotal filesize of the copy-protected content : %llu", archive.archive2_size);
-      printf ("\nYour Open PSID : ");
-      print_hash (archive.psid, 16);
-      printf ("\nTotal directories : %llu\n", archive.total_dirs);
-      chained_list_foreach (archive.dirs,
+      print_hash ((u8 *) &archive_index.header.id, 8);
+      if (archive_index.header.archive_type == 5) {
+        printf ("\nTotal filesize of the copy-protected content : %llu", archive_index.footer.archive2_size);
+        printf ("\nYour Open PSID : ");
+        print_hash (archive_index.footer.psid, 16);
+      }
+      printf ("\nTotal directories : %llu\n", archive_index.total_dirs);
+      chained_list_foreach (archive_index.dirs,
           (ChainedListForeachCallback) archive_print_dir, (void *) "    ");
-      printf ("\nTotal files : %llu\n", archive.total_files);
-      chained_list_foreach (archive.files,
+      printf ("\nTotal files : %llu\n", archive_index.total_files);
+      chained_list_foreach (archive_index.files,
           (ChainedListForeachCallback) archive_print_file, (void *) "    ");
-      printf ("\nTotal archive size : %llu bytes\n", archive.total_file_sizes);
+      printf ("\nTotal archive size : %llu bytes\n", archive_index.total_file_sizes);
     } else if (strcmp (argv[i], "ReadData") == 0) {
-      DataArchive archive;
+      ArchiveData archive_data;
 
       if (i + 1 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
       i++;
-      if (!data_archive_read (&archive, argv[i]))
-        die ("Error parsing archive!\n");
+      if (!data_archive_read (&archive_data, argv[i]))
+        die ("Error parsing archive data!\n");
       printf ("Backup id : ");
-      print_hash ((u8 *) &archive.id, 8);
-      printf ("\nData archive index : %d\n", archive.index);
-      printf ("Backup id type : %d\n", archive.id_type);
-      printf ("Backup type : %d\n", archive.type);
+      print_hash ((u8 *) &archive_data.header.id, 8);
+      printf ("\nData archive index : %d\n", archive_data.header.index);
+      printf ("Backup id type : %d\n", archive_data.header.id_type);
+      printf ("Backup type : %d\n", archive_data.header.archive_type);
     } else if (strcmp (argv[i], "Dump") == 0) {
       if (i + 2 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
