@@ -41,7 +41,7 @@
   "\t\t  Extract from a backup all files matching the specified path\n" \
   "\t  DeleteFile backup_dir filename:\n"                               \
   "\t\t  Delete from a backup a specific file\n"                        \
-  "\t  DeletePath backup_dir path destination_dir:\n"                   \
+  "\t  DeletePath backup_dir path:\n"                   \
   "\t\t  Delete from a backup all files matching the specified path\n"  \
   "\t  Add backup_dir directory:\n"                                     \
   "\t\t  Add the given directory and subdirs to the backup\n"           \
@@ -69,16 +69,39 @@ main (int argc, char *argv[])
 
   for (i = 1; i < argc; i++) {
     if (strcmp (argv[i], "SetKeysFile") == 0) {
+      /* SetKeysFile filename */
       if (i + 1 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
       keys_conf_path = argv[++i];
-    } else if (strcmp (argv[i], "Decrypt") == 0) {
-      if (i + 2 >= argc)
+    } else if (strcmp (argv[i], "SetDeviceID") == 0) {
+      /* SetDeviceID (HEX|filename) */
+      int j;
+      u8 device_id[0x10];
+
+      if (i + 1 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
-      if (!archive_decrypt (argv[i+1], argv[i+2]))
-        die ("Error decrypting archive!\n");
-      i += 2;
+      i++;
+      if (file_exists (argv[i])) {
+        FILE *f = fopen (argv[i], "rb");
+        if (fread (device_id, 0x10, 1, f) != 1)
+          die ("Unable to read DeviceID from file\n");
+        fseek (f, 0, SEEK_END);
+        if (ftell (f) != 16)
+          die ("IDP file must be exactly 16 bytes\n");
+        fclose (f);
+      } else {
+        if (strlen (argv[i]) != 32)
+          die ("Device ID must be 16 bytes and in hex format or a filename\n");
+        if (parse_hex (argv[i], device_id, 16) != 16)
+          die ("Device ID must be in hex format or a filename\n");
+      }
+
+      archive_set_device_id (device_id);
+      DBG ("Device ID set to : ");
+      print_hash (device_id, 16);
+      DBG ("\n");
     } else if (strcmp (argv[i], "ReadIndex") == 0) {
+      /* ReadIndex archive.dat */
       ArchiveIndex archive_index;
 
       if (i + 1 >= argc)
@@ -105,6 +128,7 @@ main (int argc, char *argv[])
             archive_index.footer.archive2_size);
       }
     } else if (strcmp (argv[i], "ReadData") == 0) {
+      /* ReadData archive_XX.dat */
       ArchiveData archive_data;
 
       if (i + 1 >= argc)
@@ -117,44 +141,46 @@ main (int argc, char *argv[])
       printf ("\nData archive index : %d\n", archive_data.header.index);
       printf ("Backup id type : %d\n", archive_data.header.id_type);
       printf ("Backup type : %d\n", archive_data.header.archive_type);
+    } else if (strcmp (argv[i], "Decrypt") == 0) {
+      /* Decrypt archive[_XX].dat decrypted.dat */
+      if (i + 2 >= argc)
+        die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
+      if (!archive_decrypt (argv[i+1], argv[i+2]))
+        die ("Error decrypting archive!\n");
+      i += 2;
     } else if (strcmp (argv[i], "Dump") == 0) {
+      /* Dump backup_dir destination_dir */
       if (i + 2 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
       if (!archive_dump_all (argv[i+1], argv[i+2]))
         die ("Error dumping backup!\n");
       i += 2;
     } else if (strcmp (argv[i], "Add") == 0) {
+      /* Add backup_dir directory */
       if (i + 2 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
-      if (!archive_add (argv[i+1], argv[i+2]))
+      if (!archive_add (argv[i+1], argv[i+2], FALSE))
         die ("Error adding directory to backup!\n");
       i += 2;
-    } else if (strcmp (argv[i], "SetDeviceID") == 0) {
-      int j;
-      u8 device_id[0x10];
-
-      if (i + 1 >= argc)
+    } else if (strcmp (argv[i], "ExtractFile") == 0) {
+      /* ExtractFile backup_dir filename destination */
+      die ("Not yet implemented\n");
+    } else if (strcmp (argv[i], "ExtractPath") == 0) {
+      /* ExtractPath backup_dir path destination_dir */
+      die ("Not yet implemented\n");
+    } else if (strcmp (argv[i], "DeleteFile") == 0) {
+      /* DeleteFile backup_dir filename */
+      die ("Not yet implemented\n");
+    } else if (strcmp (argv[i], "DeletePath") == 0) {
+      /* DeletePath backup_dir path */
+      die ("Not yet implemented\n");
+    } else if (strcmp (argv[i], "AddProtected") == 0) {
+      /* AddProtected backup_dir directory */
+      if (i + 2 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
-      i++;
-      if (file_exists (argv[i])) {
-        FILE *f = fopen (argv[i], "rb");
-        if (fread (device_id, 0x10, 1, f) != 1)
-          die ("Unable to read DeviceID from file\n");
-        fseek (f, 0, SEEK_END);
-        if (ftell (f) != 16)
-          die ("IDP file must be exactly 16 bytes\n");
-        fclose (f);
-      } else {
-        if (strlen (argv[i]) != 32)
-          die ("Device ID must be 16 bytes and in hex format\n");
-        if (parse_hex (argv[i], device_id, 16) != 16)
-          die ("Device ID must be in hex format\n");
-      }
-
-      archive_set_device_id (device_id);
-      printf ("Device ID set to : ");
-      print_hash (device_id, 16);
-      printf ("\n");
+      if (!archive_add (argv[i+1], argv[i+2], TRUE))
+        die ("Error adding directory to backup!\n");
+      i += 2;
     } else {
       die (USAGE_STRING "Error: Unknown command\n", argv[0]);
     }

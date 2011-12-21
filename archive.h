@@ -106,7 +106,7 @@ int archive_find_file (ArchiveIndex *archive, const char *prefix,
     const char *path, ArchiveFile **archive_file, u32 *index, u64 *position);
 int archive_dump (const char *path, const char *prefix, const char *output);
 int archive_dump_all (const char *path, const char *output);
-int archive_add (const char *path, const char *game);
+int archive_add (const char *path, const char *game, int protected);
 int archive_set_device_id (const u8 idps[0x10]);
 
 

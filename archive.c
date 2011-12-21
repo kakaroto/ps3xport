@@ -734,7 +734,7 @@ populate_dirlist (ChainedList **dirs, ChainedList **files,
 }
 
 int
-archive_add (const char *path, const char *game)
+archive_add (const char *path, const char *game, int protected)
 {
   ChainedList *list = NULL;
   char buffer[0x10000];
@@ -754,6 +754,10 @@ archive_add (const char *path, const char *game)
   u8 key[0x10];
   u8 iv[0x10];
   u8 hmac[0x40];
+  const char *prefix = "archive";
+
+  if (protected)
+    prefix = "archive2";
 
   dir_fd = opendir(game);
   if (!dir_fd)
@@ -762,7 +766,7 @@ archive_add (const char *path, const char *game)
   populate_dirlist (&dirs, &files, game, "", dir_fd);
   closedir (dir_fd);
 
-  snprintf (buffer, sizeof(buffer), "%s/archive.dat", path);
+  snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, prefix);
   if (!index_archive_read (&archive_index, buffer))
     die ("Unable to read index archive\n");
 
@@ -779,7 +783,7 @@ archive_add (const char *path, const char *game)
   chained_list_free (dirs);
 
   while (1) {
-    snprintf (buffer, sizeof(buffer), "%s/archive_%02d.dat", path, index);
+    snprintf (buffer, sizeof(buffer), "%s/%s_%02d.dat", path, prefix, index);
     if (!file_exists (buffer)) {
       if (index == 0)
         break;
@@ -790,7 +794,7 @@ archive_add (const char *path, const char *game)
     index++;
   }
 
-  snprintf (buffer, sizeof(buffer), "%s/archive_%02d.dat", path, index);
+  snprintf (buffer, sizeof(buffer), "%s/%s_%02d.dat", path, prefix, index);
   if (file_exists (buffer)) {
     if (!archive_open (buffer, &in, &dat_header))
       die ("Couldn't open archive %d\n", index);
@@ -801,7 +805,7 @@ archive_add (const char *path, const char *game)
       die ("Wrong archive ID\n");
     if (FROM_BE (32, archive_header.index) != index)
       die ("Wrong archive index\n");
-    snprintf (buffer, sizeof(buffer), "%s/archive_%02d.tmp", path, index);
+    snprintf (buffer, sizeof(buffer), "%s/%s_%02d.tmp", path, prefix, index);
 
     if (!paged_file_open (&out, buffer, FALSE))
       die ("Couldn't open output archive %d\n", index);
@@ -838,7 +842,7 @@ archive_add (const char *path, const char *game)
     archive_header.archive_type = 5;
     archive_header.id_type = 0;
 
-    snprintf (buffer, sizeof(buffer), "%s/archive_%02d.dat", path, index);
+    snprintf (buffer, sizeof(buffer), "%s/%s_%02d.dat", path, prefix, index);
 
     if (!paged_file_open (&out, buffer, FALSE))
       die ("Couldn't open output archive %d\n", index);
@@ -897,16 +901,16 @@ archive_add (const char *path, const char *game)
   fclose (fd);
 
   if (!new_file) {
-    snprintf (buffer, 0x500, "%s/archive_%02d.bak", path, index);
-    snprintf (buffer + 0x500, 0x500, "%s/archive_%02d.dat", path, index);
+    snprintf (buffer, 0x500, "%s/%s_%02d.bak", path, prefix, index);
+    snprintf (buffer + 0x500, 0x500, "%s/%s_%02d.dat", path, prefix, index);
     if (rename (buffer + 0x500, buffer) != 0)
       die ("File rename failed\n");
-    snprintf (buffer, 0x500, "%s/archive_%02d.tmp", path, index);
+    snprintf (buffer, 0x500, "%s/%s_%02d.tmp", path, prefix, index);
     if (rename (buffer, buffer + 0x500) != 0)
       die ("File rename failed\n");
   }
-  snprintf (buffer, 0x500, "%s/archive.dat", path);
-  snprintf (buffer + 0x500, 0x500, "%s/archive.bak", path);
+  snprintf (buffer, 0x500, "%s/%s.dat", path, prefix);
+  snprintf (buffer + 0x500, 0x500, "%s/%s.bak", path, prefix);
   if (rename (buffer, buffer + 0x500) != 0)
     die ("File rename failed\n");
   if (!index_archive_write (&archive_index, buffer))
