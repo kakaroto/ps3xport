@@ -17,6 +17,11 @@
 #define FALSE 0
 #endif
 
+#define die(format, ...) {                              \
+    fprintf (stderr, format, ## __VA_ARGS__);           \
+    exit (-1);                                          \
+  }
+
 typedef struct {
   struct SHA1Context sha1;
   u8 tmp[0x40 + 0x14]; // opad + hash(ipad + message)

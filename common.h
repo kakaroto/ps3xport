@@ -50,6 +50,13 @@
 #define FROM_LE(b, x) noop##b (x)
 #endif
 
+#define DEBUG
+
+#ifdef DEBUG
+#define DBG(format, ...) fprintf (stderr, format, ## __VA_ARGS__)
+#else
+#define DBG(...)
+#endif
 
 #define ERROR(err, msg) do {                    \
     perror (msg);                               \

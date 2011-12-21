@@ -190,6 +190,28 @@ paged_file_write (PagedFile *f, void *buffer, u32 len)
   return pos;
 }
 
+int
+paged_file_splice (PagedFile *f, PagedFile *from, int len)
+{
+  char buffer[1024];
+  int total = 0;
+  int size;
+  int read;
+
+  while (len == -1 || total < len) {
+    size = len;
+    if (size == -1 || (u32) size > sizeof(buffer))
+      size = sizeof(buffer);
+
+    read = paged_file_read (from, buffer, size);
+    if (read == 0)
+      break;
+    paged_file_write (f, buffer, read);
+    total += read;
+  }
+
+  return total;
+}
 
 void
 paged_file_free (PagedFile *f)

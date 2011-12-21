@@ -35,4 +35,5 @@ ps3xport_SOURCES =  types.h \
 		sha1.c \
 		sha1.h \
 		ps3xport.c \
+		archive.c \
 		paged_file.c
