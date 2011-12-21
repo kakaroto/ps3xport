@@ -215,3 +215,32 @@ paged_file_close (PagedFile *f)
     HMACResult (&f->hmac_ctx, f->digest);
 }
 
+int
+paged_file_getline (PagedFile *f, char **line, u32 *line_len)
+{
+  int pos = 0;
+
+  if (!f->reader)
+    return -1;
+
+  if (*line == NULL) {
+    *line_len = 1024;
+    *line = malloc (*line_len);
+  }
+  while (TRUE) {
+    if (pos > (*line_len - 1)) {
+      *line_len += 1024;
+      *line = realloc (*line, *line_len);
+    }
+    if (paged_file_read (f, (*line) + pos, 1) != 1) {
+      (*line)[pos] = 0;
+      break;
+    } else if ((*line)[pos] == '\n') {
+      (*line)[pos + 1] = 0;
+      break;
+    }
+    pos++;
+  }
+
+  return pos == 0 ? -1 : pos;
+}

@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "paged_file.h"
 
 #define parse_key(where)                        \
   int len = strlen (v);                         \
@@ -20,7 +21,7 @@
 Key *
 keys_load_from_file (const char *filename, int *num_keys)
 {
-  FILE *fd = fopen (filename, "r");
+  PagedFile fd;
   Key *keys = NULL;
   Key *current_key = NULL;
   char *line = NULL;
@@ -29,11 +30,11 @@ keys_load_from_file (const char *filename, int *num_keys)
   int i, j;
   int line_len = 1024;
 
-  if (fd == NULL)
+  if (paged_file_open (&fd, filename, TRUE) == FALSE)
     return NULL;
 
   *num_keys = 0;
-  while (getline (&line, &line_len, fd) != -1) {
+  while (paged_file_getline (&fd, &line, &line_len) != -1) {
     int len = strlen (line);
 
     if (len > 1024)
@@ -98,12 +99,12 @@ keys_load_from_file (const char *filename, int *num_keys)
   }
 
   free (line);
-  fclose (fd);
+  paged_file_close (&fd);
   return keys;
  error:
   free (line);
   free (keys);
-  fclose (fd);
+  paged_file_close (&fd);
   return NULL;
 }
 
