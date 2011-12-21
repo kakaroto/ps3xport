@@ -216,7 +216,7 @@ paged_file_close (PagedFile *f)
 }
 
 int
-paged_file_getline (PagedFile *f, char **line, u32 *line_len)
+paged_file_getline (PagedFile *f, char **line, int *line_len)
 {
   int pos = 0;
 

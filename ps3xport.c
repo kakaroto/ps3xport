@@ -246,7 +246,7 @@ sc_encrypt (u32 type, u8 *laid_paid, u8 *iv, u8 *in, u32 in_size, u8 *out)
   if (keys == NULL) {
     keys = keys_load_from_file (keys_conf_path, &num_keys);
     if (keys == NULL)
-      die ("Unable to load necessary keys\n");
+      die ("Unable to load necessary keys from : %s\n", keys_conf_path);
   }
 
   sc_key = keys_find_by_revision (keys, num_keys, KEY_TYPE_SC, type);
@@ -697,6 +697,10 @@ archive_dump (const char *path, const char *output)
     }
     fclose (fd);
   }
+
+  if (open)
+    paged_file_close (&pf);
+
   return TRUE;
 }
 
@@ -986,7 +990,7 @@ main (int argc, char *argv[])
     die (USAGE_STRING, argv[0]);
 
   for (i = 1; i < argc; i++) {
-    if (strcmp (argv[i], "SetKeysPath") == 0) {
+    if (strcmp (argv[i], "SetKeysFile") == 0) {
       if (i + 1 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
       keys_conf_path = argv[++i];

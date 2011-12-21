@@ -21,7 +21,7 @@
 Key *
 keys_load_from_file (const char *filename, int *num_keys)
 {
-  PagedFile fd;
+  PagedFile fd = {0};
   Key *keys = NULL;
   Key *current_key = NULL;
   char *line = NULL;
