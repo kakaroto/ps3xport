@@ -632,7 +632,43 @@ data_archive_read (ArchiveData *archive_data, const char *path)
 }
 
 static int
-archive_dump (const char *path, const char *output)
+archive_find_file (ArchiveIndex *archive, const char *prefix,
+    const char *path, ArchiveFile **archive_file, u32 *index, u64 *position)
+{
+  ChainedList *current = archive->files;
+  struct stat stat_buf;
+  char data_path[1024];
+  u64 file_size = 0;
+
+  *index = 0;
+  *position = 0x50; // skip header
+  snprintf (data_path, sizeof(data_path), "%s_%02d.dat", prefix, *index);
+  if (stat (data_path, &stat_buf) != 0)
+    return FALSE;
+
+  while (current != NULL) {
+    ArchiveFile *file = current->data;
+    if (strcmp (file->path, path) == 0) {
+      *archive_file = file;
+      return TRUE;
+    }
+    current = current->next;
+    if (*position + file->stat.file_size >= (u64) stat_buf.st_size) {
+      *position = 0x50;
+      (*index)++;
+      snprintf (data_path, sizeof(data_path), "%s_%02d.dat", prefix, *index);
+      if (stat (data_path, &stat_buf) != 0)
+        return FALSE;
+    } else {
+      *position += file->stat.file_size;
+    }
+  }
+
+  return FALSE;
+}
+
+static int
+archive_dump (const char *path, const char *prefix, const char *output)
 {
   ChainedList *list = NULL;
   char buffer[0x10000];
@@ -643,7 +679,7 @@ archive_dump (const char *path, const char *output)
   u32 index = 0;
   int open = FALSE;
 
-  snprintf (buffer, sizeof(buffer), "%s/archive.dat", path);
+  snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, prefix);
   if (!index_archive_read (&archive_index, buffer))
     die ("Unable to read index archive\n");
 
@@ -669,7 +705,7 @@ archive_dump (const char *path, const char *output)
       u32 size = len;
 
       if (!open) {
-        snprintf (buffer, sizeof(buffer), "%s/archive_%02d.dat", path, index);
+        snprintf (buffer, sizeof(buffer), "%s/%s_%02d.dat", path, prefix, index);
         if (!archive_open (buffer, &pf, &dat_header)) {
           die ("Couldn't open archive %d\n", index);
         }
@@ -704,6 +740,17 @@ archive_dump (const char *path, const char *output)
   return TRUE;
 }
 
+static int
+archive_dump_all (const char *path, const char *output)
+{
+  int ret;
+
+  ret = archive_dump (path, "archive", output);
+  if (ret && device_id_set)
+    archive_dump (path, "archive2", output);
+
+  return ret;
+}
 
 static int
 chained_list_contains_string (ChainedList *list, const char *string)
@@ -1042,7 +1089,7 @@ main (int argc, char *argv[])
     } else if (strcmp (argv[i], "Dump") == 0) {
       if (i + 2 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
-      if (!archive_dump (argv[i+1], argv[i+2]))
+      if (!archive_dump_all (argv[i+1], argv[i+2]))
         die ("Error dumping backup!\n");
       i += 2;
     } else if (strcmp (argv[i], "Add") == 0) {
