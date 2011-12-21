@@ -50,7 +50,7 @@
 #define FROM_LE(b, x) noop##b (x)
 #endif
 
-#define DEBUG
+#undef DEBUG
 
 #ifdef DEBUG
 #define DBG(format, ...) fprintf (stderr, format, ## __VA_ARGS__)

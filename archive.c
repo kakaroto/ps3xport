@@ -591,16 +591,6 @@ archive_dump (const char *path, const char *prefix, const char *output)
     FILE *fd;
     u64 len = file->stat.file_size;
 
-
-    {
-      u64 p; u32 i; ArchiveFile *f = NULL; int r;
-      snprintf (buffer, sizeof(buffer), "%s/%s", path, prefix);
-      r = archive_find_file (&archive_index, buffer, file->path, &f, &i, &p);
-
-      printf ("Find file '%s' returned %d : index %d at %llu\n", file->path, r, i, p);
-      printf ("File %p == %p. We were at %d : %llu\n\n", f, file, index, open? pf.pos : 0);
-    }
-
     snprintf (buffer, sizeof(buffer), "%s/%s", output, file->path);
     fd = fopen (buffer, "wb");
     if (!fd)
@@ -686,7 +676,7 @@ populate_dirlist (ChainedList **dirs, ChainedList **files,
     if (strcmp (dirent->d_name, ".") == 0 ||
         strcmp (dirent->d_name, "..") == 0)
       continue;
-    printf ("Found %s : %s/%s\n", dirent->d_type == DT_DIR ? "directory" : "file" ,
+    DBG ("Found %s : %s/%s\n", dirent->d_type == DT_DIR ? "directory" : "file" ,
         subdir, dirent->d_name);
     if (dirent->d_type == DT_DIR) {
       ArchiveDirectory *archive_dir = malloc (sizeof(ArchiveDirectory));
