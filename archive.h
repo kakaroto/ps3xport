@@ -31,6 +31,18 @@ typedef struct {
   u64 block_size;
 } FileStat;
 
+#define ARCHIVE_FILE_STAT_FROM_BE(x)                \
+  (x).mode = FROM_BE (32, (x).mode);                \
+     (x).uid = FROM_BE (32, (x).uid);               \
+     (x).gid = FROM_BE (32, (x).gid);               \
+     (x).atime = FROM_BE (64, (x).atime);           \
+     (x).mtime = FROM_BE (64, (x).mtime);           \
+     (x).ctime = FROM_BE (64, (x).ctime);           \
+     (x).file_size = FROM_BE (64, (x).file_size);   \
+     (x).block_size = FROM_BE (64, (x).block_size);
+
+#define ARCHIVE_FILE_STAT_TO_BE(x) ARCHIVE_FILE_STAT_FROM_BE (x)
+
 typedef struct {
   union {
     char path[0x520];
@@ -44,6 +56,16 @@ typedef struct {
   u32 flags; /* 1 == dev_flash2 */
 } ArchiveFile;
 
+#define ARCHIVE_FILE_FROM_BE(x)                 \
+  ARCHIVE_FILE_STAT_FROM_BE ((x).stat);         \
+  (x).flags = FROM_BE (32, (x).flags);
+#define ARCHIVE_FILE_TO_BE(x) ARCHIVE_FILE_FROM_BE (x)
+
+#define ARCHIVE_FILE_EOS_FROM_BE(x)                                     \
+  (x).eos.total_files = FROM_BE (64, (x).eos.total_files);              \
+     (x).eos.total_file_sizes = FROM_BE (64, (x).eos.total_file_sizes);
+#define ARCHIVE_FILE_EOS_TO_BE(x) ARCHIVE_FILE_EOS_FROM_BE (x)
+
 typedef struct {
   union {
     char path[0x420];
@@ -56,6 +78,15 @@ typedef struct {
   u32 flags; /* must be 1 for normal or 3 for dev_flash2 */
 } ArchiveDirectory;
 
+#define ARCHIVE_DIRECTORY_FROM_BE(x)                 \
+  ARCHIVE_FILE_STAT_FROM_BE ((x).stat);              \
+  (x).flags = FROM_BE (32, (x).flags);
+#define ARCHIVE_DIRECTORY_TO_BE(x) ARCHIVE_DIRECTORY_FROM_BE (x)
+
+#define ARCHIVE_DIRECTORY_EOS_FROM_BE(x)                                \
+  (x).eos.total_dirs = FROM_BE (64, (x).eos.total_dirs);
+#define ARCHIVE_DIRECTORY_EOS_TO_BE(x) ARCHIVE_DIRECTORY_EOS_FROM_BE (x)
+
 typedef struct {
   u32 size;
   u32 type;
@@ -63,6 +94,12 @@ typedef struct {
   u8 key_seed[0x14];
   u8 padding[0x10];
 } DatFileHeader;
+
+#define ARCHIVE_DAT_FILE_HEADER_FROM_BE(x)                 \
+  (x).size = FROM_LE (32, (x).size);                       \
+  (x).type = FROM_BE (32, (x).type);
+#define ARCHIVE_DAT_FILE_HEADER_TO_BE(x) ARCHIVE_DAT_FILE_HEADER_FROM_BE (x)
+
 
 typedef struct {
   u64 id;
@@ -72,11 +109,19 @@ typedef struct {
   u16 padding;
 } ArchiveHeader;
 
+#define ARCHIVE_HEADER_FROM_BE(x)               \
+  (x).index = FROM_BE (32, (x).index);
+#define ARCHIVE_HEADER_TO_BE(x) ARCHIVE_HEADER_FROM_BE (x)
+
 typedef struct {
   u8 psid[0x10];
   u64 archive2_size;
   u64 padding;
 } ArchiveIndexFooter;
+
+#define ARCHIVE_INDEX_FOOTER_FROM_BE(x)                 \
+  (x).archive2_size = FROM_BE (64, (x).archive2_size);
+#define ARCHIVE_INDEX_FOOTER_TO_BE(x) ARCHIVE_INDEX_FOOTER_FROM_BE (x)
 
 typedef struct {
   const char *prefix;
@@ -100,10 +145,10 @@ void chained_list_free (ChainedList *list);
 
 int archive_open (const char *path, PagedFile *file, DatFileHeader *dat_header);
 int archive_decrypt (const char *path, const char *to);
-int index_archive_read (ArchiveIndex *archive_index, const char *path);
-int index_archive_write (ArchiveIndex *archive_index, const char *path);
-int index_archive_free (ArchiveIndex *archive_index);
-int data_archive_read (ArchiveData *archive_data, const char *path);
+int archive_index_read (ArchiveIndex *archive_index, const char *path);
+int archive_index_write (ArchiveIndex *archive_index, const char *path);
+int archive_index_free (ArchiveIndex *archive_index);
+int archive_data_read (ArchiveData *archive_data, const char *path);
 int archive_find_file (ArchiveIndex *archive, const char *path,
     const char *filename, ArchiveFile **archive_file, u32 *index, u64 *position);
 int archive_dump (const char *path, const char *prefix, const char *output);

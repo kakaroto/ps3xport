@@ -108,7 +108,7 @@ main (int argc, char *argv[])
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
       i++;
 
-      if (!index_archive_read (&archive_index, argv[i]))
+      if (!archive_index_read (&archive_index, argv[i]))
         die ("Error parsing archive index!\n");
       printf ("Files : \n");
       chained_list_foreach (archive_index.files,
@@ -128,7 +128,7 @@ main (int argc, char *argv[])
         printf ("\nTotal filesize of the copy-protected content : %llu bytes\n",
             archive_index.footer.archive2_size);
       }
-      index_archive_free (&archive_index);
+      archive_index_free (&archive_index);
     } else if (strcmp (argv[i], "ReadData") == 0) {
       /* ReadData archive_XX.dat */
       ArchiveData archive_data;
@@ -137,7 +137,7 @@ main (int argc, char *argv[])
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
       i++;
 
-      if (!data_archive_read (&archive_data, argv[i]))
+      if (!archive_data_read (&archive_data, argv[i]))
         die ("Error parsing archive data!\n");
       printf ("Backup id : ");
       print_hash ((u8 *) &archive_data.header.id, 8);
@@ -220,19 +220,19 @@ main (int argc, char *argv[])
 
       /* Read archive2.dat and archive.dat */
       snprintf (path, sizeof(path), "%s/archive2.dat", argv[i+1]);
-      if (!index_archive_read (&archive2, path))
+      if (!archive_index_read (&archive2, path))
         die ("Error parsing archive index!\n");
       snprintf (path, sizeof(path), "%s/archive.dat", argv[i+1]);
-      if (!index_archive_read (&archive, path))
+      if (!archive_index_read (&archive, path))
         die ("Error parsing archive index!\n");
 
       /* Fix the footer from archive.dat */
       archive.footer.archive2_size = archive.total_file_sizes;
-      if (!index_archive_write (&archive, path))
+      if (!archive_index_write (&archive, path))
         die ("Error parsing archive index!\n");
 
-      index_archive_free (&archive);
-      index_archive_free (&archive2);
+      archive_index_free (&archive);
+      archive_index_free (&archive2);
       i += 2;
     } else {
       die (USAGE_STRING "Error: Unknown command\n", argv[0]);

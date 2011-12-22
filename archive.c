@@ -196,9 +196,7 @@ archive_open (const char *path, PagedFile *file, DatFileHeader *dat_header)
     DBG ("Couldn't read dat file header\n");
     goto end;
   }
-
-  dat_header->size = FROM_LE (32, dat_header->size);
-  dat_header->type = FROM_BE (32, dat_header->type);
+  ARCHIVE_DAT_FILE_HEADER_FROM_BE (*dat_header);
 
   if (dat_header->size != 0x40 && dat_header->size != 0x30) {
     DBG ("Invalid dat header size : %X\n", dat_header->size);
@@ -244,9 +242,9 @@ archive_decrypt (const char *path, const char *to)
     goto end;
   }
 
-  dat_header.size = TO_LE (32, dat_header.size);
-  dat_header.type = TO_BE (32, dat_header.type);
+  ARCHIVE_DAT_FILE_HEADER_TO_BE (dat_header);
   fwrite (&dat_header, sizeof(dat_header), 1, fd);
+  ARCHIVE_DAT_FILE_HEADER_FROM_BE (dat_header);
 
   do {
     u8 buffer[1024];
@@ -270,7 +268,7 @@ archive_decrypt (const char *path, const char *to)
 }
 
 int
-index_archive_read (ArchiveIndex *archive_index, const char *path)
+archive_index_read (ArchiveIndex *archive_index, const char *path)
 {
   PagedFile file = {0};
   DatFileHeader dat_header;
@@ -288,7 +286,7 @@ index_archive_read (ArchiveIndex *archive_index, const char *path)
     DBG ("Couldn't read archive encrypted header\n");
     goto end;
   }
-  archive_index->header.index = FROM_BE (32, archive_index->header.index);
+  ARCHIVE_HEADER_FROM_BE (archive_index->header);
 
   while(1) {
     ArchiveFile *archive_file = malloc (sizeof(ArchiveFile));
@@ -297,20 +295,13 @@ index_archive_read (ArchiveIndex *archive_index, const char *path)
       goto end;
     }
     if (archive_file->eos.zero == 0) {
-      archive_index->total_files = FROM_BE (64, archive_file->eos.total_files);
-      archive_index->total_file_sizes = FROM_BE (64, archive_file->eos.total_file_sizes);
+      ARCHIVE_FILE_EOS_FROM_BE (*archive_file);
+      archive_index->total_files = archive_file->eos.total_files;
+      archive_index->total_file_sizes = archive_file->eos.total_file_sizes;
       free (archive_file);
       break;
     }
-    archive_file->stat.mode = FROM_BE (32, archive_file->stat.mode);
-    archive_file->stat.uid = FROM_BE (32, archive_file->stat.uid);
-    archive_file->stat.gid = FROM_BE (32, archive_file->stat.gid);
-    archive_file->stat.atime = FROM_BE (64, archive_file->stat.atime);
-    archive_file->stat.mtime = FROM_BE (64, archive_file->stat.mtime);
-    archive_file->stat.ctime = FROM_BE (64, archive_file->stat.ctime);
-    archive_file->stat.file_size = FROM_BE (64, archive_file->stat.file_size);
-    archive_file->stat.block_size = FROM_BE (64, archive_file->stat.block_size);
-    archive_file->flags = FROM_BE (32, archive_file->flags);
+    ARCHIVE_FILE_FROM_BE (*archive_file);
     archive_index->files = chained_list_append (archive_index->files, archive_file);
     DBG ("File : %s\n", archive_file->path);
   }
@@ -321,19 +312,12 @@ index_archive_read (ArchiveIndex *archive_index, const char *path)
       goto end;
     }
     if (archive_dir->eos.zero == 0) {
-      archive_index->total_dirs = FROM_BE (64, archive_dir->eos.total_dirs);
+      ARCHIVE_DIRECTORY_EOS_FROM_BE (*archive_dir);
+      archive_index->total_dirs = archive_dir->eos.total_dirs;
       free (archive_dir);
       break;
     }
-    archive_dir->stat.mode = FROM_BE (32, archive_dir->stat.mode);
-    archive_dir->stat.uid = FROM_BE (32, archive_dir->stat.uid);
-    archive_dir->stat.gid = FROM_BE (32, archive_dir->stat.gid);
-    archive_dir->stat.atime = FROM_BE (64, archive_dir->stat.atime);
-    archive_dir->stat.mtime = FROM_BE (64, archive_dir->stat.mtime);
-    archive_dir->stat.ctime = FROM_BE (64, archive_dir->stat.ctime);
-    archive_dir->stat.file_size = FROM_BE (64, archive_dir->stat.file_size);
-    archive_dir->stat.block_size = FROM_BE (64, archive_dir->stat.block_size);
-    archive_dir->flags = FROM_BE (32, archive_dir->flags);
+    ARCHIVE_DIRECTORY_FROM_BE (*archive_dir);
     archive_index->dirs = chained_list_append (archive_index->dirs, archive_dir);
     DBG ("Directory : %s\n", archive_dir->path);
   }
@@ -343,7 +327,7 @@ index_archive_read (ArchiveIndex *archive_index, const char *path)
       DBG ("Couldn't read index archive footer\n");
       goto end;
     }
-    archive_index->footer.archive2_size = FROM_BE (64, archive_index->footer.archive2_size);
+    ARCHIVE_INDEX_FOOTER_FROM_BE (archive_index->footer);
   }
 
   paged_file_close (&file);
@@ -362,7 +346,7 @@ index_archive_read (ArchiveIndex *archive_index, const char *path)
 
 
 int
-index_archive_write (ArchiveIndex *archive_index, const char *path)
+archive_index_write (ArchiveIndex *archive_index, const char *path)
 {
   FILE *fd = NULL;
   PagedFile file = {0};
@@ -379,15 +363,17 @@ index_archive_write (ArchiveIndex *archive_index, const char *path)
     goto end;
   }
 
-  dat_header.size = TO_LE (32, 0x40);
-  dat_header.type = TO_BE (32, 0x05);
+  dat_header.size = 0x40;
+  dat_header.type = 0x05;
   generate_random_key_seed (dat_header.key_seed);
   memset (dat_header.padding, 0, 0x10);
 
+  ARCHIVE_DAT_FILE_HEADER_TO_BE (dat_header);
   if (paged_file_write (&file, &dat_header, sizeof(dat_header)) != sizeof(dat_header)) {
     DBG ("Couldn't write file dat header\n");
     goto end;
   }
+  ARCHIVE_DAT_FILE_HEADER_FROM_BE (dat_header);
 
   if (!archive_gen_keys (&dat_header, key, iv, hmac)) {
     DBG ("Error generating keys\n");
@@ -414,60 +400,56 @@ index_archive_write (ArchiveIndex *archive_index, const char *path)
 
     archive_index->total_files++;
     archive_index->total_file_sizes += archive_file->stat.file_size;
-    archive_file->stat.mode = TO_BE (32, archive_file->stat.mode);
-    archive_file->stat.uid = TO_BE (32, archive_file->stat.uid);
-    archive_file->stat.gid = TO_BE (32, archive_file->stat.gid);
-    archive_file->stat.atime = TO_BE (64, archive_file->stat.atime);
-    archive_file->stat.mtime = TO_BE (64, archive_file->stat.mtime);
-    archive_file->stat.ctime = TO_BE (64, archive_file->stat.ctime);
-    archive_file->stat.file_size = TO_BE (64, archive_file->stat.file_size);
-    archive_file->stat.block_size = TO_BE (64, archive_file->stat.block_size);
-    archive_file->flags = TO_BE (32, archive_file->flags);
+
+    ARCHIVE_FILE_TO_BE (*archive_file);
     if (paged_file_write (&file, archive_file, sizeof(ArchiveFile)) != sizeof(ArchiveFile)) {
       DBG ("Couldn't write file entry\n");
       goto end;
     }
+    ARCHIVE_FILE_FROM_BE (*archive_file);
   }
   file_eos.eos.zero = 0;
   file_eos.eos.total_files = TO_BE (64, archive_index->total_files);
   file_eos.eos.total_file_sizes = TO_BE (64, archive_index->total_file_sizes);
+
+  ARCHIVE_FILE_EOS_TO_BE (file_eos);
   if (paged_file_write (&file, &file_eos, sizeof(ArchiveFile)) != sizeof(ArchiveFile)) {
     DBG ("Couldn't write file EOS\n");
     goto end;
   }
+  ARCHIVE_FILE_EOS_FROM_BE (file_eos);
+
   archive_index->total_dirs = 0;
   for (list = archive_index->dirs; list; list = list->next) {
     ArchiveDirectory *archive_dir = list->data;
 
     archive_index->total_dirs++;
-    archive_dir->stat.mode = TO_BE (32, archive_dir->stat.mode);
-    archive_dir->stat.uid = TO_BE (32, archive_dir->stat.uid);
-    archive_dir->stat.gid = TO_BE (32, archive_dir->stat.gid);
-    archive_dir->stat.atime = TO_BE (64, archive_dir->stat.atime);
-    archive_dir->stat.mtime = TO_BE (64, archive_dir->stat.mtime);
-    archive_dir->stat.ctime = TO_BE (64, archive_dir->stat.ctime);
-    archive_dir->stat.file_size = TO_BE (64, archive_dir->stat.file_size);
-    archive_dir->stat.block_size = TO_BE (64, archive_dir->stat.block_size);
-    archive_dir->flags = TO_BE (32, archive_dir->flags);
+    ARCHIVE_DIRECTORY_TO_BE (*archive_dir);
     if (paged_file_write (&file, archive_dir, sizeof(ArchiveDirectory)) != sizeof(ArchiveDirectory)) {
       DBG ("Couldn't write dir entry\n");
       goto end;
     }
+    ARCHIVE_DIRECTORY_FROM_BE (*archive_dir);
   }
   dir_eos.eos.zero = 0;
   dir_eos.eos.total_dirs = TO_BE (64, archive_index->total_dirs);
+
+  ARCHIVE_DIRECTORY_EOS_TO_BE (dir_eos);
   if (paged_file_write (&file, &dir_eos, sizeof(ArchiveDirectory)) != sizeof(ArchiveDirectory)) {
     DBG ("Couldn't write dir EOS\n");
     goto end;
   }
+  ARCHIVE_DIRECTORY_EOS_FROM_BE (dir_eos);
 
   if (archive_index->header.archive_type == 5) {
-    archive_index->footer.archive2_size = TO_BE (64, archive_index->footer.archive2_size);
     archive_index->footer.padding = 0;
+
+    ARCHIVE_INDEX_FOOTER_TO_BE (archive_index->footer);
     if (paged_file_write (&file, &archive_index->footer, sizeof(archive_index->footer)) != sizeof(archive_index->footer)) {
       DBG ("Couldn't write archive index footer\n");
       goto end;
     }
+    ARCHIVE_INDEX_FOOTER_FROM_BE (archive_index->footer);
   }
 
   paged_file_flush (&file);
@@ -488,22 +470,22 @@ index_archive_write (ArchiveIndex *archive_index, const char *path)
 }
 
 static void
-index_archive_free_cb (void *to_free, void *ignore)
+archive_index_free_cb (void *to_free, void *ignore)
 {
   free (to_free);
 }
 
 int
-index_archive_free (ArchiveIndex *archive_index)
+archive_index_free (ArchiveIndex *archive_index)
 {
-  chained_list_foreach (archive_index->files, index_archive_free_cb, NULL);
-  chained_list_foreach (archive_index->dirs, index_archive_free_cb, NULL);
+  chained_list_foreach (archive_index->files, archive_index_free_cb, NULL);
+  chained_list_foreach (archive_index->dirs, archive_index_free_cb, NULL);
   chained_list_free (archive_index->files);
   chained_list_free (archive_index->dirs);
 }
 
 int
-data_archive_read (ArchiveData *archive_data, const char *path)
+archive_data_read (ArchiveData *archive_data, const char *path)
 {
   PagedFile file = {0};
   DatFileHeader dat_header;
@@ -520,7 +502,7 @@ data_archive_read (ArchiveData *archive_data, const char *path)
     DBG ("Couldn't read encrypted header\n");
     goto end;
   }
-  archive_data->header.index = FROM_BE (32, archive_data->header.index);
+  ARCHIVE_HEADER_FROM_BE (archive_data->header);
 
   do {
     u8 buffer[1024];
@@ -599,9 +581,11 @@ archive_extract (ArchiveIndex *archive_index, const char *path, u32 index,
 
     if (paged_file_read (&in, &archive_header, sizeof(archive_header)) != sizeof(archive_header))
       die ("Couldn't read archive header\n");
+    ARCHIVE_HEADER_FROM_BE (archive_header);
+
     if (archive_header.id != archive_index->header.id)
       die ("Wrong archive ID\n");
-    if (FROM_BE (32, archive_header.index) != index)
+    if (archive_header.index != index)
       die ("Wrong archive index\n");
     paged_file_seek (&in, offset);
     index++;
@@ -631,24 +615,24 @@ archive_extract_file (const char *path, const char *filename, const char *output
   /* Try to extract from archive.dat */
   archive.prefix = "archive";
   snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive.prefix);
-  if (!index_archive_read (&archive, buffer))
+  if (!archive_index_read (&archive, buffer))
     die ("Unable to read index archive\n");
 
   if (archive_find_file (&archive, path, filename, &file, &index, &offset)) {
     ret = archive_extract (&archive, path, index, offset, file->stat.file_size, output);
-    index_archive_free (&archive);
+    archive_index_free (&archive);
   } else if (device_id_set) {
     ArchiveIndex archive2;
 
     archive2.prefix = "archive2";
     /* Extract from archive2.dat */
     snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive2.prefix);
-    if (!index_archive_read (&archive2, buffer))
+    if (!archive_index_read (&archive2, buffer))
       die ("Unable to read index archive\n");
 
     if (archive_find_file (&archive2, path, filename, &file, &index, &offset))
       ret = archive_extract (&archive2, path, index, offset, file->stat.file_size, output);
-      index_archive_free (&archive2);
+      archive_index_free (&archive2);
   }
 
   return ret;
@@ -677,7 +661,7 @@ archive_extract_path (const char *path, const char *match, const char *output)
   /* Try to extract from archive.dat */
   archive.prefix = "archive";
   snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive.prefix);
-  if (!index_archive_read (&archive, buffer))
+  if (!archive_index_read (&archive, buffer))
     die ("Unable to read index archive\n");
 
   chained_list_foreach (archive.files,
@@ -687,7 +671,7 @@ archive_extract_path (const char *path, const char *match, const char *output)
   if (device_id_set) {
     archive2.prefix = "archive2";
     snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive2.prefix);
-    if (!index_archive_read (&archive2, buffer))
+    if (!archive_index_read (&archive2, buffer))
       die ("Unable to read index archive\n");
 
     chained_list_foreach (archive2.files,
@@ -713,8 +697,8 @@ archive_extract_path (const char *path, const char *match, const char *output)
     }
     current = current->next;
   }
-  index_archive_free (&archive);
-  index_archive_free (&archive2);
+  archive_index_free (&archive);
+  archive_index_free (&archive2);
   chained_list_free (all_files);
 
   return TRUE;
@@ -733,15 +717,15 @@ archive_rename_file (const char *path, const char *filename, const char *destina
   /* Try to extract from archive.dat */
   archive.prefix = "archive";
   snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive.prefix);
-  if (!index_archive_read (&archive, buffer))
+  if (!archive_index_read (&archive, buffer))
     die ("Unable to read index archive\n");
 
   if (archive_find_file (&archive, path, filename, &file, &index, &offset)) {
     strcpy (file->path, destination);
-    if (!index_archive_write (&archive, buffer))
+    if (!archive_index_write (&archive, buffer))
       die ("Unable to write index archive\n");
   }
-  index_archive_free (&archive);
+  archive_index_free (&archive);
 
   if (device_id_set) {
     ArchiveIndex archive2;
@@ -749,18 +733,18 @@ archive_rename_file (const char *path, const char *filename, const char *destina
     archive2.prefix = "archive2";
     /* Extract from archive2.dat */
     snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive2.prefix);
-    if (!index_archive_read (&archive2, buffer))
+    if (!archive_index_read (&archive2, buffer))
       die ("Unable to read index archive\n");
 
     if (archive_find_file (&archive2, path, filename, &file, &index, &offset)) {
       strcpy (file->path, destination);
-      if (!index_archive_write (&archive2, buffer))
+      if (!archive_index_write (&archive2, buffer))
         die ("Unable to write index archive\n");
     }
-    index_archive_free (&archive2);
+    archive_index_free (&archive2);
   }
 
-  return FALSE;
+  return TRUE;
 }
 
 int
@@ -780,7 +764,7 @@ archive_rename_path (const char *path, const char *match, const char *destinatio
   /* Try to extract from archive.dat */
   archive.prefix = "archive";
   snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive.prefix);
-  if (!index_archive_read (&archive, buffer))
+  if (!archive_index_read (&archive, buffer))
     die ("Unable to read index archive\n");
 
   chained_list_foreach (archive.files,
@@ -790,7 +774,7 @@ archive_rename_path (const char *path, const char *match, const char *destinatio
   if (device_id_set) {
     archive2.prefix = "archive2";
     snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive2.prefix);
-    if (!index_archive_read (&archive2, buffer))
+    if (!archive_index_read (&archive2, buffer))
       die ("Unable to read index archive\n");
 
     chained_list_foreach (archive2.files,
@@ -807,8 +791,8 @@ archive_rename_path (const char *path, const char *match, const char *destinatio
     current = current->next;
   }
 
-  index_archive_free (&archive);
-  index_archive_free (&archive2);
+  archive_index_free (&archive);
+  archive_index_free (&archive2);
   chained_list_free (all_files);
 
   return TRUE;
@@ -828,7 +812,7 @@ archive_dump (const char *path, const char *prefix, const char *output)
 
   snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, prefix);
   archive_index.prefix = prefix;
-  if (!index_archive_read (&archive_index, buffer))
+  if (!archive_index_read (&archive_index, buffer))
     die ("Unable to read index archive\n");
 
   for (list = archive_index.dirs; list; list = list->next) {
@@ -860,9 +844,11 @@ archive_dump (const char *path, const char *prefix, const char *output)
 
         if (paged_file_read (&pf, &archive_header, sizeof(archive_header)) != sizeof(archive_header))
           die ("Couldn't read archive header\n");
+        ARCHIVE_HEADER_FROM_BE (archive_header);
+
         if (archive_header.id != archive_index.header.id)
           die ("Wrong archive ID\n");
-        if (FROM_BE (32, archive_header.index) != index)
+        if (archive_header.index != index)
           die ("Wrong archive index\n");
         index++;
         open = TRUE;
@@ -884,7 +870,7 @@ archive_dump (const char *path, const char *prefix, const char *output)
 
   if (open)
     paged_file_close (&pf);
-  index_archive_free (&archive_index);
+  archive_index_free (&archive_index);
 
   return TRUE;
 }
@@ -1014,7 +1000,7 @@ archive_add (const char *path, const char *game, int protected)
   closedir (dir_fd);
 
   snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive_index.prefix);
-  if (!index_archive_read (&archive_index, buffer))
+  if (!archive_index_read (&archive_index, buffer))
     die ("Unable to read index archive\n");
 
   for (list = dirs; list; list = list->next) {
@@ -1048,19 +1034,22 @@ archive_add (const char *path, const char *game, int protected)
 
     if (paged_file_read (&in, &archive_header, sizeof(archive_header)) != sizeof(archive_header))
       die ("Couldn't read header\n");
+    ARCHIVE_HEADER_FROM_BE (archive_header);
+
     if (archive_header.id != archive_index.header.id)
       die ("Wrong archive ID\n");
-    if (FROM_BE (32, archive_header.index) != index)
+    if (archive_header.index != index)
       die ("Wrong archive index\n");
     snprintf (buffer, sizeof(buffer), "%s/%s_%02d.tmp", path, archive_index.prefix, index);
 
     if (!paged_file_open (&out, buffer, FALSE))
       die ("Couldn't open output archive %d\n", index);
 
-    dat_header.size = TO_LE (32, dat_header.size);
-    dat_header.type = TO_BE (32, dat_header.type);
+    ARCHIVE_DAT_FILE_HEADER_TO_BE (dat_header);
     if (paged_file_write (&out, &dat_header, sizeof(dat_header)) != sizeof(dat_header))
       die ("Couldn't write file dat header\n");
+    ARCHIVE_DAT_FILE_HEADER_FROM_BE (dat_header);
+
     total_file_size += sizeof(dat_header);
 
     if (!archive_gen_keys (&dat_header, key, iv, hmac))
@@ -1080,25 +1069,28 @@ archive_add (const char *path, const char *game, int protected)
     new_file = FALSE;
   } else {
     if (protected) {
-      dat_header.size = TO_LE (32, 0x30);
+      dat_header.size =  0x30;
       memset (dat_header.key_seed, 0, 0x14);
     } else {
-      dat_header.size = TO_LE (32, 0x40);
+      dat_header.size = 0x40;
       generate_random_key_seed (dat_header.key_seed);
     }
-    dat_header.type = TO_BE (32, 0x05);
+    dat_header.type = 0x05;
     memset (dat_header.padding, 0, 0x10);
 
     archive_header = archive_index.header;
-    archive_header.index = TO_BE (32, index);
+    archive_header.index = index;
 
     snprintf (buffer, sizeof(buffer), "%s/%s_%02d.dat", path, archive_index.prefix, index);
 
     if (!paged_file_open (&out, buffer, FALSE))
       die ("Couldn't open output archive %d\n", index);
 
+    ARCHIVE_DAT_FILE_HEADER_TO_BE (dat_header);
     if (paged_file_write (&out, &dat_header, sizeof(dat_header)) != sizeof(dat_header))
       die ("Couldn't write file dat header\n");
+    ARCHIVE_DAT_FILE_HEADER_FROM_BE (dat_header);
+
     total_file_size += sizeof(dat_header);
 
     if (!archive_gen_keys (&dat_header, key, iv, hmac))
@@ -1108,8 +1100,11 @@ archive_add (const char *path, const char *game, int protected)
     paged_file_hash (&out, hmac);
     paged_file_crypt (&out, key, iv);
 
+    ARCHIVE_HEADER_TO_BE (archive_header);
     if (paged_file_write (&out, &archive_header, sizeof(archive_header)) != sizeof(archive_header))
       die ("Couldn't write encrypted header\n");
+    ARCHIVE_HEADER_TO_BE (archive_header);
+
     total_file_size += sizeof(archive_header);
     new_file = TRUE;
   }
@@ -1163,10 +1158,10 @@ archive_add (const char *path, const char *game, int protected)
   snprintf (buffer + 0x500, 0x500, "%s/%s.bak", path, archive_index.prefix);
   if (rename (buffer, buffer + 0x500) != 0)
     die ("File rename failed\n");
-  if (!index_archive_write (&archive_index, buffer))
+  if (!archive_index_write (&archive_index, buffer))
     die ("Unable to write index archive\n");
 
-  index_archive_free (&archive_index);
+  archive_index_free (&archive_index);
 
   return TRUE;
 }
