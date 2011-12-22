@@ -527,23 +527,23 @@ data_archive_read (ArchiveData *archive_data, const char *path)
 }
 
 int
-archive_find_file (ArchiveIndex *archive, const char *prefix,
-    const char *path, ArchiveFile **archive_file, u32 *index, u64 *position)
+archive_find_file (ArchiveIndex *archive_index, const char *path,
+    const char *filename, ArchiveFile **archive_file, u32 *index, u64 *position)
 {
-  ChainedList *current = archive->files;
+  ChainedList *current = archive_index->files;
   struct stat stat_buf;
   char data_path[1024];
   u64 file_size = 0;
 
   *index = 0;
   *position = 0x50; // skip header
-  snprintf (data_path, sizeof(data_path), "%s_%02d.dat", prefix, *index);
+  snprintf (data_path, sizeof(data_path), "%s/%s_%02d.dat", path, archive_index->prefix, *index);
   if (stat (data_path, &stat_buf) != 0)
     return FALSE;
 
   while (current != NULL) {
     ArchiveFile *file = current->data;
-    if (strcmp (file->path, path) == 0) {
+    if (strcmp (file->path, filename) == 0) {
       *archive_file = file;
       return TRUE;
     }
@@ -551,7 +551,7 @@ archive_find_file (ArchiveIndex *archive, const char *prefix,
     if (*position + file->stat.file_size >= (u64) stat_buf.st_size) {
       *position = 0x50;
       (*index)++;
-      snprintf (data_path, sizeof(data_path), "%s_%02d.dat", prefix, *index);
+      snprintf (data_path, sizeof(data_path), "%s/%s_%02d.dat", path, archive_index->prefix, *index);
       if (stat (data_path, &stat_buf) != 0)
         return FALSE;
     } else {
@@ -560,6 +560,145 @@ archive_find_file (ArchiveIndex *archive, const char *prefix,
   }
 
   return FALSE;
+}
+
+int
+archive_extract (ArchiveIndex *archive_index, const char *path, u32 index,
+    u64 offset, u64 size, const char *output)
+{
+  char filename[1024];
+  DatFileHeader dat_header;
+  ArchiveHeader archive_header;
+  PagedFile in = {0};
+  PagedFile out = {0};
+
+  if (!paged_file_open (&out, output, FALSE))
+    die ("Couldn't open output file : %s\n", output);
+
+  while (size > 0) {
+    int read;
+
+    snprintf (filename, sizeof(filename), "%s/%s_%02d.dat", path, archive_index->prefix, index);
+    if (!archive_open (filename, &in, &dat_header))
+      die ("Couldn't open archive %d\n", index);
+
+    if (paged_file_read (&in, &archive_header, sizeof(archive_header)) != sizeof(archive_header))
+      die ("Couldn't read archive header\n");
+    if (archive_header.id != archive_index->header.id)
+      die ("Wrong archive ID\n");
+    if (FROM_BE (32, archive_header.index) != index)
+      die ("Wrong archive index\n");
+    paged_file_seek (&in, offset);
+    index++;
+    offset = 0x50;
+
+    read = paged_file_splice (&out, &in, size);
+    size -= read;
+    paged_file_close (&in);
+  }
+
+  paged_file_close (&out);
+
+  return TRUE;
+}
+
+int
+archive_extract_file (const char *path, const char *filename, const char *output)
+{
+  ArchiveIndex archive;
+  ArchiveFile *file = NULL;
+  char buffer[1024];
+  u32 index;
+  u64 offset;
+  u64 size;
+
+  /* Try to extract from archive.dat */
+  archive.prefix = "archive";
+  snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive.prefix);
+  if (!index_archive_read (&archive, buffer))
+    die ("Unable to read index archive\n");
+
+  if (archive_find_file (&archive, path, filename, &file, &index, &offset))
+    return archive_extract (&archive, path, index, offset, file->stat.file_size, output);
+
+  if (device_id_set) {
+    ArchiveIndex archive2;
+
+    archive2.prefix = "archive2";
+    /* Extract from archive2.dat */
+    snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive2.prefix);
+    if (!index_archive_read (&archive2, buffer))
+      die ("Unable to read index archive\n");
+
+    if (archive_find_file (&archive2, path, filename, &file, &index, &offset))
+      return archive_extract (&archive2, path, index, offset, file->stat.file_size, output);
+  }
+
+  return FALSE;
+}
+
+static void
+archive_extract_path_cb (ArchiveFile *file, ChainedList **list)
+{
+  *list = chained_list_append (*list, file);
+}
+
+int
+archive_extract_path (const char *path, const char *match, const char *output)
+{
+  ChainedList *all_files = NULL;
+  ChainedList *current;
+  ArchiveIndex archive;
+  ArchiveFile *file = NULL;
+  char buffer[2048];
+  u32 index;
+  u64 offset;
+  u64 size;
+  int match_len = strlen (match);
+
+  /* Try to extract from archive.dat */
+  archive.prefix = "archive";
+  snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive.prefix);
+  if (!index_archive_read (&archive, buffer))
+    die ("Unable to read index archive\n");
+
+  chained_list_foreach (archive.files,
+      (ChainedListForeachCallback) archive_extract_path_cb, &all_files);
+
+  /* Try to extract from archive2.dat */
+  if (device_id_set) {
+    ArchiveIndex archive2;
+
+    archive2.prefix = "archive2";
+    snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive2.prefix);
+    if (!index_archive_read (&archive2, buffer))
+      die ("Unable to read index archive\n");
+
+    chained_list_foreach (archive2.files,
+        (ChainedListForeachCallback) archive_extract_path_cb, &all_files);
+  }
+
+  current = all_files;
+  while (current != NULL) {
+    ArchiveFile *file = current->data;
+    if (strncmp (file->path, match, match_len) == 0) {
+      int i;
+
+      snprintf (buffer, sizeof(buffer), "%s/%s", output, file->path);
+      i = strlen (buffer);
+      while (i > 0 && buffer[i] != '/') i--;
+      if (i > 0) {
+        buffer[i] = 0;
+        mkdir_recursive (buffer);
+        buffer[i] = '/';
+      }
+      if (!archive_extract_file (path, file->path, buffer))
+        return FALSE;
+    }
+    current = current->next;
+  }
+
+  return TRUE;
 }
 
 int
@@ -575,6 +714,7 @@ archive_dump (const char *path, const char *prefix, const char *output)
   int open = FALSE;
 
   snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, prefix);
+  archive_index.prefix = prefix;
   if (!index_archive_read (&archive_index, buffer))
     die ("Unable to read index archive\n");
 
@@ -744,10 +884,13 @@ archive_add (const char *path, const char *game, int protected)
   u8 key[0x10];
   u8 iv[0x10];
   u8 hmac[0x40];
-  const char *prefix = "archive";
+
+
 
   if (protected)
-    prefix = "archive2";
+    archive_index.prefix = "archive2";
+  else
+    archive_index.prefix = "archive";
 
   dir_fd = opendir(game);
   if (!dir_fd)
@@ -756,7 +899,7 @@ archive_add (const char *path, const char *game, int protected)
   populate_dirlist (&dirs, &files, game, "", dir_fd);
   closedir (dir_fd);
 
-  snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, prefix);
+  snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive_index.prefix);
   if (!index_archive_read (&archive_index, buffer))
     die ("Unable to read index archive\n");
 
@@ -773,7 +916,7 @@ archive_add (const char *path, const char *game, int protected)
   chained_list_free (dirs);
 
   while (1) {
-    snprintf (buffer, sizeof(buffer), "%s/%s_%02d.dat", path, prefix, index);
+    snprintf (buffer, sizeof(buffer), "%s/%s_%02d.dat", path, archive_index.prefix, index);
     if (!file_exists (buffer)) {
       if (index == 0)
         break;
@@ -784,7 +927,7 @@ archive_add (const char *path, const char *game, int protected)
     index++;
   }
 
-  snprintf (buffer, sizeof(buffer), "%s/%s_%02d.dat", path, prefix, index);
+  snprintf (buffer, sizeof(buffer), "%s/%s_%02d.dat", path, archive_index.prefix, index);
   if (file_exists (buffer)) {
     if (!archive_open (buffer, &in, &dat_header))
       die ("Couldn't open archive %d\n", index);
@@ -795,7 +938,7 @@ archive_add (const char *path, const char *game, int protected)
       die ("Wrong archive ID\n");
     if (FROM_BE (32, archive_header.index) != index)
       die ("Wrong archive index\n");
-    snprintf (buffer, sizeof(buffer), "%s/%s_%02d.tmp", path, prefix, index);
+    snprintf (buffer, sizeof(buffer), "%s/%s_%02d.tmp", path, archive_index.prefix, index);
 
     if (!paged_file_open (&out, buffer, FALSE))
       die ("Couldn't open output archive %d\n", index);
@@ -822,17 +965,20 @@ archive_add (const char *path, const char *game, int protected)
     paged_file_close (&in);
     new_file = FALSE;
   } else {
-    dat_header.size = TO_LE (32, 0x40);
+    if (protected) {
+      dat_header.size = TO_LE (32, 0x30);
+      memset (dat_header.key_seed, 0, 0x14);
+    } else {
+      dat_header.size = TO_LE (32, 0x40);
+      generate_random_key_seed (dat_header.key_seed);
+    }
     dat_header.type = TO_BE (32, 0x05);
-    generate_random_key_seed (dat_header.key_seed);
     memset (dat_header.padding, 0, 0x10);
 
-    archive_header.id = archive_index.header.id;
+    archive_header = archive_index.header;
     archive_header.index = TO_BE (32, index);
-    archive_header.archive_type = 5;
-    archive_header.id_type = 0;
 
-    snprintf (buffer, sizeof(buffer), "%s/%s_%02d.dat", path, prefix, index);
+    snprintf (buffer, sizeof(buffer), "%s/%s_%02d.dat", path, archive_index.prefix, index);
 
     if (!paged_file_open (&out, buffer, FALSE))
       die ("Couldn't open output archive %d\n", index);
@@ -891,16 +1037,16 @@ archive_add (const char *path, const char *game, int protected)
   fclose (fd);
 
   if (!new_file) {
-    snprintf (buffer, 0x500, "%s/%s_%02d.bak", path, prefix, index);
-    snprintf (buffer + 0x500, 0x500, "%s/%s_%02d.dat", path, prefix, index);
+    snprintf (buffer, 0x500, "%s/%s_%02d.bak", path, archive_index.prefix, index);
+    snprintf (buffer + 0x500, 0x500, "%s/%s_%02d.dat", path, archive_index.prefix, index);
     if (rename (buffer + 0x500, buffer) != 0)
       die ("File rename failed\n");
-    snprintf (buffer, 0x500, "%s/%s_%02d.tmp", path, prefix, index);
+    snprintf (buffer, 0x500, "%s/%s_%02d.tmp", path, archive_index.prefix, index);
     if (rename (buffer, buffer + 0x500) != 0)
       die ("File rename failed\n");
   }
-  snprintf (buffer, 0x500, "%s/%s.dat", path, prefix);
-  snprintf (buffer + 0x500, 0x500, "%s/%s.bak", path, prefix);
+  snprintf (buffer, 0x500, "%s/%s.dat", path, archive_index.prefix);
+  snprintf (buffer + 0x500, 0x500, "%s/%s.bak", path, archive_index.prefix);
   if (rename (buffer, buffer + 0x500) != 0)
     die ("File rename failed\n");
   if (!index_archive_write (&archive_index, buffer))

@@ -32,6 +32,7 @@ int paged_file_crypt (PagedFile *f, u8 *key, u8 *iv);
 int paged_file_hash (PagedFile *f, u8 *key);
 int paged_file_read (PagedFile *f, void *buffer, u32 len);
 int paged_file_getline (PagedFile *f, char **line, int *line_len);
+int paged_file_seek (PagedFile *f, u64 offset);
 int paged_file_write (PagedFile *f, void *buffer, u32 len);
 int paged_file_splice (PagedFile *f, PagedFile *from, int len);
 int paged_file_flush (PagedFile *f);
