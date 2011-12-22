@@ -487,6 +487,21 @@ index_archive_write (ArchiveIndex *archive_index, const char *path)
   return FALSE;
 }
 
+static void
+index_archive_free_cb (void *to_free, void *ignore)
+{
+  free (to_free);
+}
+
+int
+index_archive_free (ArchiveIndex *archive_index)
+{
+  chained_list_foreach (archive_index->files, index_archive_free_cb, NULL);
+  chained_list_foreach (archive_index->dirs, index_archive_free_cb, NULL);
+  chained_list_free (archive_index->files);
+  chained_list_free (archive_index->dirs);
+}
+
 int
 data_archive_read (ArchiveData *archive_data, const char *path)
 {
@@ -638,7 +653,7 @@ archive_extract_file (const char *path, const char *filename, const char *output
 }
 
 static void
-archive_extract_path_cb (ArchiveFile *file, ChainedList **list)
+archive_append_file_to_list_cb (ArchiveFile *file, ChainedList **list)
 {
   *list = chained_list_append (*list, file);
 }
@@ -663,7 +678,7 @@ archive_extract_path (const char *path, const char *match, const char *output)
     die ("Unable to read index archive\n");
 
   chained_list_foreach (archive.files,
-      (ChainedListForeachCallback) archive_extract_path_cb, &all_files);
+      (ChainedListForeachCallback) archive_append_file_to_list_cb, &all_files);
 
   /* Try to extract from archive2.dat */
   if (device_id_set) {
@@ -675,7 +690,7 @@ archive_extract_path (const char *path, const char *match, const char *output)
       die ("Unable to read index archive\n");
 
     chained_list_foreach (archive2.files,
-        (ChainedListForeachCallback) archive_extract_path_cb, &all_files);
+        (ChainedListForeachCallback) archive_append_file_to_list_cb, &all_files);
   }
 
   current = all_files;
@@ -693,6 +708,95 @@ archive_extract_path (const char *path, const char *match, const char *output)
         buffer[i] = '/';
       }
       if (!archive_extract_file (path, file->path, buffer))
+        return FALSE;
+    }
+    current = current->next;
+  }
+
+  return TRUE;
+}
+
+int
+archive_rename_file (const char *path, const char *filename, const char *destination)
+{
+  ArchiveIndex archive;
+  ArchiveFile *file = NULL;
+  char buffer[1024];
+  u32 index;
+  u64 offset;
+  u64 size;
+
+  /* Try to extract from archive.dat */
+  archive.prefix = "archive";
+  snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive.prefix);
+  if (!index_archive_read (&archive, buffer))
+    die ("Unable to read index archive\n");
+
+  if (archive_find_file (&archive, path, filename, &file, &index, &offset)) {
+    strcpy (file->path, destination);
+    if (!index_archive_write (&archive, buffer))
+      die ("Unable to write index archive\n");
+  }
+
+  if (device_id_set) {
+    ArchiveIndex archive2;
+
+    archive2.prefix = "archive2";
+    /* Extract from archive2.dat */
+    snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive2.prefix);
+    if (!index_archive_read (&archive2, buffer))
+      die ("Unable to read index archive\n");
+
+    if (archive_find_file (&archive2, path, filename, &file, &index, &offset)) {
+      strcpy (file->path, destination);
+      if (!index_archive_write (&archive2, buffer))
+        die ("Unable to write index archive\n");
+    }
+  }
+
+  return FALSE;
+}
+
+int
+archive_rename_path (const char *path, const char *match, const char *destination)
+{
+  ChainedList *all_files = NULL;
+  ChainedList *current;
+  ArchiveIndex archive;
+  ArchiveFile *file = NULL;
+  char buffer[2048];
+  u32 index;
+  u64 offset;
+  u64 size;
+  int match_len = strlen (match);
+
+  /* Try to extract from archive.dat */
+  archive.prefix = "archive";
+  snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive.prefix);
+  if (!index_archive_read (&archive, buffer))
+    die ("Unable to read index archive\n");
+
+  chained_list_foreach (archive.files,
+      (ChainedListForeachCallback) archive_append_file_to_list_cb, &all_files);
+
+  /* Try to extract from archive2.dat */
+  if (device_id_set) {
+    ArchiveIndex archive2;
+
+    archive2.prefix = "archive2";
+    snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive2.prefix);
+    if (!index_archive_read (&archive2, buffer))
+      die ("Unable to read index archive\n");
+
+    chained_list_foreach (archive2.files,
+        (ChainedListForeachCallback) archive_append_file_to_list_cb, &all_files);
+  }
+
+  current = all_files;
+  while (current != NULL) {
+    ArchiveFile *file = current->data;
+    if (strncmp (file->path, match, match_len) == 0) {
+      if (!archive_rename_file (path, file->path, destination))
         return FALSE;
     }
     current = current->next;

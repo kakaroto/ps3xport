@@ -183,13 +183,17 @@ main (int argc, char *argv[])
       /* DeleteFile backup_dir filename */
       if (i + 2 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
-      die ("Not yet implemented\n");
+
+      archive_rename_file (argv[i+1], argv[i+2], "/dev_hdd0/tmp/null");
+
       i += 2;
     } else if (strcmp (argv[i], "DeletePath") == 0) {
       /* DeletePath backup_dir path */
       if (i + 2 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
-      die ("Not yet implemented\n");
+
+      archive_rename_path (argv[i+1], argv[i+2], "/dev_hdd0/tmp/null");
+
       i += 2;
     } else if (strcmp (argv[i], "Add") == 0) {
       /* Add backup_dir directory */
