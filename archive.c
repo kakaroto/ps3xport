@@ -626,6 +626,7 @@ archive_extract_file (const char *path, const char *filename, const char *output
   u32 index;
   u64 offset;
   u64 size;
+  int ret = FALSE;
 
   /* Try to extract from archive.dat */
   archive.prefix = "archive";
@@ -633,10 +634,10 @@ archive_extract_file (const char *path, const char *filename, const char *output
   if (!index_archive_read (&archive, buffer))
     die ("Unable to read index archive\n");
 
-  if (archive_find_file (&archive, path, filename, &file, &index, &offset))
-    return archive_extract (&archive, path, index, offset, file->stat.file_size, output);
-
-  if (device_id_set) {
+  if (archive_find_file (&archive, path, filename, &file, &index, &offset)) {
+    ret = archive_extract (&archive, path, index, offset, file->stat.file_size, output);
+    index_archive_free (&archive);
+  } else if (device_id_set) {
     ArchiveIndex archive2;
 
     archive2.prefix = "archive2";
@@ -646,10 +647,11 @@ archive_extract_file (const char *path, const char *filename, const char *output
       die ("Unable to read index archive\n");
 
     if (archive_find_file (&archive2, path, filename, &file, &index, &offset))
-      return archive_extract (&archive2, path, index, offset, file->stat.file_size, output);
+      ret = archive_extract (&archive2, path, index, offset, file->stat.file_size, output);
+      index_archive_free (&archive2);
   }
 
-  return FALSE;
+  return ret;
 }
 
 static void
@@ -663,7 +665,8 @@ archive_extract_path (const char *path, const char *match, const char *output)
 {
   ChainedList *all_files = NULL;
   ChainedList *current;
-  ArchiveIndex archive;
+  ArchiveIndex archive = {0};
+  ArchiveIndex archive2 = {0};
   ArchiveFile *file = NULL;
   char buffer[2048];
   u32 index;
@@ -682,8 +685,6 @@ archive_extract_path (const char *path, const char *match, const char *output)
 
   /* Try to extract from archive2.dat */
   if (device_id_set) {
-    ArchiveIndex archive2;
-
     archive2.prefix = "archive2";
     snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive2.prefix);
     if (!index_archive_read (&archive2, buffer))
@@ -712,6 +713,9 @@ archive_extract_path (const char *path, const char *match, const char *output)
     }
     current = current->next;
   }
+  index_archive_free (&archive);
+  index_archive_free (&archive2);
+  chained_list_free (all_files);
 
   return TRUE;
 }
@@ -737,6 +741,7 @@ archive_rename_file (const char *path, const char *filename, const char *destina
     if (!index_archive_write (&archive, buffer))
       die ("Unable to write index archive\n");
   }
+  index_archive_free (&archive);
 
   if (device_id_set) {
     ArchiveIndex archive2;
@@ -752,6 +757,7 @@ archive_rename_file (const char *path, const char *filename, const char *destina
       if (!index_archive_write (&archive2, buffer))
         die ("Unable to write index archive\n");
     }
+    index_archive_free (&archive2);
   }
 
   return FALSE;
@@ -762,7 +768,8 @@ archive_rename_path (const char *path, const char *match, const char *destinatio
 {
   ChainedList *all_files = NULL;
   ChainedList *current;
-  ArchiveIndex archive;
+  ArchiveIndex archive = {0};
+  ArchiveIndex archive2 = {0};
   ArchiveFile *file = NULL;
   char buffer[2048];
   u32 index;
@@ -781,8 +788,6 @@ archive_rename_path (const char *path, const char *match, const char *destinatio
 
   /* Try to extract from archive2.dat */
   if (device_id_set) {
-    ArchiveIndex archive2;
-
     archive2.prefix = "archive2";
     snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive2.prefix);
     if (!index_archive_read (&archive2, buffer))
@@ -801,6 +806,10 @@ archive_rename_path (const char *path, const char *match, const char *destinatio
     }
     current = current->next;
   }
+
+  index_archive_free (&archive);
+  index_archive_free (&archive2);
+  chained_list_free (all_files);
 
   return TRUE;
 }
@@ -875,6 +884,7 @@ archive_dump (const char *path, const char *prefix, const char *output)
 
   if (open)
     paged_file_close (&pf);
+  index_archive_free (&archive_index);
 
   return TRUE;
 }
@@ -1155,6 +1165,8 @@ archive_add (const char *path, const char *game, int protected)
     die ("File rename failed\n");
   if (!index_archive_write (&archive_index, buffer))
     die ("Unable to write index archive\n");
+
+  index_archive_free (&archive_index);
 
   return TRUE;
 }

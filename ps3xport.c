@@ -128,6 +128,7 @@ main (int argc, char *argv[])
         printf ("\nTotal filesize of the copy-protected content : %llu bytes\n",
             archive_index.footer.archive2_size);
       }
+      index_archive_free (&archive_index);
     } else if (strcmp (argv[i], "ReadData") == 0) {
       /* ReadData archive_XX.dat */
       ArchiveData archive_data;
@@ -230,6 +231,8 @@ main (int argc, char *argv[])
       if (!index_archive_write (&archive, path))
         die ("Error parsing archive index!\n");
 
+      index_archive_free (&archive);
+      index_archive_free (&archive2);
       i += 2;
     } else {
       die (USAGE_STRING "Error: Unknown command\n", argv[0]);
