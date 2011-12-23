@@ -39,14 +39,14 @@ paged_file_open (PagedFile *f, const char *path, int reader)
   return paged_file_init (f, fd, reader);
 }
 
-static int
+static void
 paged_file_hash_internal (PagedFile *f)
 {
   if (f->hash && (f->size - f->pos) > 0)
     HMACInput (&f->hmac_ctx, f->ptr + f->pos, f->size - f->pos);
 }
 
-static int
+static void
 paged_file_crypt_internal (PagedFile *f)
 {
   if (f->crypt && (f->size - f->pos) > 0) {
@@ -203,7 +203,8 @@ paged_file_seek (PagedFile *f, u64 offset)
 
   if (f->crypt && offset >= 0x10) {
     fseek (f->fd, offset - 0x10, SEEK_SET);
-    fread (f->iv, 1, 0x10, f->fd);
+    if (fread (f->iv, 1, 0x10, f->fd) != 1)
+      return -1;
   }
   fseek (f->fd, offset, SEEK_SET);
   paged_file_read_new_page (f);

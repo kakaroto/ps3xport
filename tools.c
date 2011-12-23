@@ -14,6 +14,7 @@
 #include <zlib.h>
 #include <dirent.h>
 #include <assert.h>
+#include <ctype.h>
 
 #ifdef WIN32
 #include <windows.h>

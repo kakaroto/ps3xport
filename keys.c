@@ -41,8 +41,10 @@ keys_load_from_file (const char *filename, int *num_keys)
       continue;
     i = 0;
     j = 0;
-    while (i < len && line[i] != '=')
-      k[i] = line[i++];
+    while (i < len && line[i] != '=') {
+      k[i] = line[i];
+      i++;
+    }
     k[i++] = 0;
     if (i >= len)
       continue;

@@ -353,8 +353,8 @@ archive_index_write (ArchiveIndex *archive_index, const char *path)
   FILE *fd = NULL;
   PagedFile file = {0};
   DatFileHeader dat_header;
-  ArchiveFile file_eos = {0};
-  ArchiveDirectory dir_eos = {0};
+  ArchiveFile file_eos;
+  ArchiveDirectory dir_eos;
   ChainedList *list;
   u8 key[0x10];
   u8 iv[0x10];
@@ -411,6 +411,7 @@ archive_index_write (ArchiveIndex *archive_index, const char *path)
     }
     ARCHIVE_FILE_FROM_BE (*archive_file);
   }
+  memset (&file_eos, 0, sizeof(ArchiveFile));
   file_eos.eos.zero = 0;
   file_eos.eos.total_files = archive_index->total_files;
   file_eos.eos.total_file_sizes = archive_index->total_file_sizes;
@@ -434,6 +435,8 @@ archive_index_write (ArchiveIndex *archive_index, const char *path)
     }
     ARCHIVE_DIRECTORY_FROM_BE (*archive_dir);
   }
+
+  memset (&dir_eos, 0, sizeof(ArchiveDirectory));
   dir_eos.eos.zero = 0;
   dir_eos.eos.total_dirs = archive_index->total_dirs;
 
@@ -478,7 +481,7 @@ archive_index_free_cb (void *to_free, void *ignore)
   free (to_free);
 }
 
-int
+void
 archive_index_free (ArchiveIndex *archive_index)
 {
   chained_list_foreach (archive_index->files, archive_index_free_cb, NULL);
@@ -533,7 +536,6 @@ archive_find_file (ArchiveIndex *archive_index, const char *path,
   ChainedList *current = archive_index->files;
   struct stat stat_buf;
   char data_path[1024];
-  u64 file_size = 0;
 
   *index = 0;
   *position = 0x50; // skip header
@@ -612,7 +614,6 @@ archive_extract_file (const char *path, const char *filename, const char *output
   char buffer[1024];
   u32 index;
   u64 offset;
-  u64 size;
   int ret = FALSE;
 
   /* Try to extract from archive.dat */
@@ -655,11 +656,7 @@ archive_extract_path (const char *path, const char *match, const char *output)
   ChainedList *current;
   ArchiveIndex archive = {0};
   ArchiveIndex archive2 = {0};
-  ArchiveFile *file = NULL;
   char buffer[2048];
-  u32 index;
-  u64 offset;
-  u64 size;
   int match_len = strlen (match);
 
   /* Try to extract from archive.dat */
@@ -716,7 +713,6 @@ archive_rename_file (const char *path, const char *filename, const char *destina
   char buffer[1024];
   u32 index;
   u64 offset;
-  u64 size;
 
   /* Try to extract from archive.dat */
   archive.prefix = "archive";
@@ -758,11 +754,7 @@ archive_rename_path (const char *path, const char *match, const char *destinatio
   ChainedList *current;
   ArchiveIndex archive = {0};
   ArchiveIndex archive2 = {0};
-  ArchiveFile *file = NULL;
   char buffer[2048];
-  u32 index;
-  u64 offset;
-  u64 size;
   int match_len = strlen (match);
 
   /* Try to extract from archive.dat */
@@ -980,7 +972,6 @@ archive_add (const char *path, const char *game, int protected)
   PagedFile in = {0};
   PagedFile out = {0};
   u32 index = 0;
-  int open = FALSE;
   FILE *fd = NULL;
   DIR *dir_fd = NULL;
   u32 total_file_size = 0;
@@ -1182,8 +1173,8 @@ archive_create_backup (const char *path, const char *content, const char *protec
   get_rand ((u8 *)&archive_id, 8);
 
   if (protected_content &&
-      protected_content[0] != '-' &&
-      protected_content[0] != 0) {
+      protected_content[0] != 0 &&
+      (protected_content[0] != '-' || protected_content[1] != 0)) {
     archive2.prefix = "archive2";
     archive2.header.id = archive_id;
     archive2.header.index = 0;
@@ -1199,11 +1190,14 @@ archive_create_backup (const char *path, const char *content, const char *protec
 
     if (!archive_index_read (&archive2, filename))
       die ("Unable to read index archive\n");
+
+    snprintf (filename, sizeof(filename), "%s/%s.bak", path, archive2.prefix);
+    remove (filename);
   }
 
   if (content &&
-      content[0] != '-' &&
-      content[0] != 0) {
+      content[0] != 0 &&
+      (content[0] != '-' || content[1] != 0) ) {
     archive.prefix = "archive";
     archive.header.id = archive_id;
     archive.header.index = 0;
@@ -1218,10 +1212,19 @@ archive_create_backup (const char *path, const char *content, const char *protec
 
     if (archive_add (path, content, FALSE) == FALSE)
       return FALSE;
+
+    snprintf (filename, sizeof(filename), "%s/%s.bak", path, archive.prefix);
+    remove (filename);
   }
 
   archive_index_free (&archive);
   archive_index_free (&archive2);
+
+  if (protected_content == NULL ||
+      protected_content[0] == 0 ||
+      (protected_content[0] == '-' &&
+          protected_content[1] == 0))
+    archive_delete_protected (path);
 
   return TRUE;
 }
@@ -1230,31 +1233,41 @@ int
 archive_delete_protected (const char *path)
 {
   ArchiveIndex archive;
+  FILE *fd = NULL;
   char buffer[1024];
+  char archive_type = 3;
 
   archive.prefix = "archive";
   snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive.prefix);
   if (!archive_index_read (&archive, buffer))
     die ("Unable to read index archive\n");
 
-  /* TODO: dat_header.type = 3? */
   archive.footer.archive2_size = 0;
   if (!archive_index_write (&archive, buffer))
     die ("Unable to write index archive\n");
 
   archive_index_free (&archive);
+  fd = fopen (buffer, "rb+");
+  if (fd == NULL)
+    return FALSE;
+  fseek (fd, 7, SEEK_SET);
+  if (fwrite (&archive_type, 1, 1, fd) != 1) {
+    fclose (fd);
+    return FALSE;
+  }
+  fclose (fd);
 
   return TRUE;
 }
 
-int
+void
 archive_set_device_id (const u8 idps[0x10])
 {
   memcpy (device_id, idps, 0x10);
   device_id_set = TRUE;
 }
 
-int
+void
 archive_set_open_psid (const u8 psid[0x10])
 {
   memcpy (open_psid, psid, 0x10);

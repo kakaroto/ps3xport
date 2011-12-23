@@ -147,7 +147,7 @@ int archive_open (const char *path, PagedFile *file, DatFileHeader *dat_header);
 int archive_decrypt (const char *path, const char *to);
 int archive_index_read (ArchiveIndex *archive_index, const char *path);
 int archive_index_write (ArchiveIndex *archive_index, const char *path);
-int archive_index_free (ArchiveIndex *archive_index);
+void archive_index_free (ArchiveIndex *archive_index);
 int archive_data_read (ArchiveData *archive_data, const char *path);
 int archive_find_file (ArchiveIndex *archive, const char *path,
     const char *filename, ArchiveFile **archive_file, u32 *index, u64 *position);
@@ -162,7 +162,7 @@ int archive_dump_all (const char *path, const char *output);
 int archive_add (const char *path, const char *game, int protected);
 int archive_create_backup (const char *path, const char *content, const char *protected_content);
 int archive_delete_protected (const char *path);
-int archive_set_device_id (const u8 idps[0x10]);
-int archive_set_open_psid (const u8 psid[0x10]);
+void archive_set_device_id (const u8 idps[0x10]);
+void archive_set_open_psid (const u8 psid[0x10]);
 
 #endif /* __ARCHIVE_H__ */

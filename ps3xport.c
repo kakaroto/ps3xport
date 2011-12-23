@@ -29,6 +29,8 @@
   "\t\t  Set the DeviceID needed for decrypting archive2.dat\n"         \
   "\t  SetPSID (HEX|filename):\n"                                       \
   "\t\t  Set the OpenPSID needed for creating new backups\n"            \
+  "\t  ExtractPSID backup_dir output:\n"                                \
+  "\t\t  Extract the OpenPSID from a backup directory\n"                \
   "\t  ReadIndex archive.dat:\n"                                        \
   "\t\t  Parse the specified index file and print info\n"               \
   "\t  ReadData archive_XX.dat:\n"                                      \
@@ -84,30 +86,49 @@ main (int argc, char *argv[])
         strcmp (argv[i], "SetPSID") == 0) {
       /* SetDeviceID (HEX|filename) */
       /* SetPSID (HEX|filename) */
-      int j;
       u8 id[0x10];
 
       if (i + 1 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
+
       if (file_exists (argv[i+1])) {
         FILE *f = fopen (argv[i+1], "rb");
         if (fread (id, 0x10, 1, f) != 1)
-          die ("Unable to read DeviceID from file\n");
+          die ("Unable to read ID from file\n");
         fseek (f, 0, SEEK_END);
         if (ftell (f) != 16)
-          die ("IDP file must be exactly 16 bytes\n");
+          die ("ID file must be exactly 16 bytes\n");
         fclose (f);
       } else {
         if (strlen (argv[i+1]) != 32)
-          die ("Device ID must be 16 bytes and in hex format or a filename\n");
+          die ("ID must be 16 bytes and in hex format or a filename\n");
         if (parse_hex (argv[i+1], id, 16) != 16)
-          die ("Device ID must be in hex format or a filename\n");
+          die ("ID must be in hex format or a filename\n");
       }
       if (strcmp (argv[i], "SetDeviceID") == 0)
         archive_set_device_id (id);
       else
         archive_set_open_psid (id);
       i++;
+    }  else if (strcmp (argv[i], "ExtractPSID") == 0) {
+      /* ExtractPSID backup_dir output */
+      ArchiveIndex archive;
+      char path[1024];
+      FILE *f = NULL;
+
+      if (i + 2 >= argc)
+        die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
+
+      snprintf (path, sizeof(path), "%s/archive.dat", argv[i+1]);
+      if (!archive_index_read (&archive, path))
+        die ("Error parsing archive index!\n");
+
+      f = fopen (argv[i+2], "wb");
+      if (fwrite (archive.footer.psid, 0x10, 1, f) != 1)
+        die ("Unable to write ID from file\n");
+      fclose (f);
+
+      i += 2;
     } else if (strcmp (argv[i], "ReadIndex") == 0) {
       /* ReadIndex archive.dat */
       ArchiveIndex archive_index;
