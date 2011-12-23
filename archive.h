@@ -160,7 +160,9 @@ int archive_rename_file (const char *path, const char *filename, const char *des
 int archive_rename_path (const char *path, const char *match, const char *destination);
 int archive_dump_all (const char *path, const char *output);
 int archive_add (const char *path, const char *game, int protected);
+int archive_create_backup (const char *path, const char *content, const char *protected_content);
+int archive_delete_protected (const char *path);
 int archive_set_device_id (const u8 idps[0x10]);
-
+int archive_set_open_psid (const u8 psid[0x10]);
 
 #endif /* __ARCHIVE_H__ */

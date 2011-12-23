@@ -27,6 +27,8 @@
   "\t\t  Set the path to the keys.conf file  (default: keys.conf)\n"    \
   "\t  SetDeviceID (HEX|filename):\n"                                   \
   "\t\t  Set the DeviceID needed for decrypting archive2.dat\n"         \
+  "\t  SetPSID (HEX|filename):\n"                                       \
+  "\t\t  Set the OpenPSID needed for creating new backups\n"            \
   "\t  ReadIndex archive.dat:\n"                                        \
   "\t\t  Parse the specified index file and print info\n"               \
   "\t  ReadData archive_XX.dat:\n"                                      \
@@ -41,12 +43,17 @@
   "\t\t  Extract from a backup all files matching the specified path\n" \
   "\t  DeleteFile backup_dir filename:\n"                               \
   "\t\t  Delete from a backup a specific file\n"                        \
-  "\t  DeletePath backup_dir path:\n"                   \
+  "\t  DeletePath backup_dir path:\n"                                   \
   "\t\t  Delete from a backup all files matching the specified path\n"  \
+  "\t  DeleteProtected backup_dir\n"                                    \
+  "\t\t  Deletes the copy-protected files from the backup\n"            \
   "\t  Add backup_dir directory:\n"                                     \
   "\t\t  Add the given directory and subdirs to the backup\n"           \
   "\t  AddProtected backup_dir directory:\n"                            \
-  "\t\t  Add the given directory and subdirs to the copy-protected backup\n\n"
+  "\t\t  Add the given directory and subdirs to the copy-protected backup\n" \
+  "\t  CreateBackup backup_dir content protected_content\n"             \
+  "\t\t  Create a new backup with a content dir and a copy-protected content\n" \
+  "\t\t    Set the content path to '-' to ignore it\n\n"
 
 static void
 archive_print_dir (ArchiveDirectory *dir, char *prefix)
@@ -73,33 +80,34 @@ main (int argc, char *argv[])
       if (i + 1 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
       keys_conf_path = argv[++i];
-    } else if (strcmp (argv[i], "SetDeviceID") == 0) {
+    } else if (strcmp (argv[i], "SetDeviceID") == 0 ||
+        strcmp (argv[i], "SetPSID") == 0) {
       /* SetDeviceID (HEX|filename) */
+      /* SetPSID (HEX|filename) */
       int j;
-      u8 device_id[0x10];
+      u8 id[0x10];
 
       if (i + 1 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
-      i++;
-      if (file_exists (argv[i])) {
-        FILE *f = fopen (argv[i], "rb");
-        if (fread (device_id, 0x10, 1, f) != 1)
+      if (file_exists (argv[i+1])) {
+        FILE *f = fopen (argv[i+1], "rb");
+        if (fread (id, 0x10, 1, f) != 1)
           die ("Unable to read DeviceID from file\n");
         fseek (f, 0, SEEK_END);
         if (ftell (f) != 16)
           die ("IDP file must be exactly 16 bytes\n");
         fclose (f);
       } else {
-        if (strlen (argv[i]) != 32)
+        if (strlen (argv[i+1]) != 32)
           die ("Device ID must be 16 bytes and in hex format or a filename\n");
-        if (parse_hex (argv[i], device_id, 16) != 16)
+        if (parse_hex (argv[i+1], id, 16) != 16)
           die ("Device ID must be in hex format or a filename\n");
       }
-
-      archive_set_device_id (device_id);
-      DBG ("Device ID set to : ");
-      print_hash (device_id, 16);
-      DBG ("\n");
+      if (strcmp (argv[i], "SetDeviceID") == 0)
+        archive_set_device_id (id);
+      else
+        archive_set_open_psid (id);
+      i++;
     } else if (strcmp (argv[i], "ReadIndex") == 0) {
       /* ReadIndex archive.dat */
       ArchiveIndex archive_index;
@@ -196,6 +204,14 @@ main (int argc, char *argv[])
       archive_rename_path (argv[i+1], argv[i+2], "/dev_hdd0/tmp/null");
 
       i += 2;
+    } else if (strcmp (argv[i], "DeleteProtected") == 0) {
+      /* DeleteProtected backup_dir */
+      if (i + 1 >= argc)
+        die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
+
+      archive_delete_protected (argv[i+1]);
+
+      i++;
     } else if (strcmp (argv[i], "Add") == 0) {
       /* Add backup_dir directory */
       if (i + 2 >= argc)
@@ -234,6 +250,18 @@ main (int argc, char *argv[])
       archive_index_free (&archive);
       archive_index_free (&archive2);
       i += 2;
+    } else if (strcmp (argv[i], "CreateBackup") == 0) {
+      /* ExtractFile backup_dir filename destination */
+      if (i + 3 >= argc)
+        die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
+
+      if (file_exists (argv[i+1]))
+          die ("Backup dir must not exist in order to create a new one\n");
+
+      if (!archive_create_backup (argv[i+1], argv[i+2], argv[i+3]))
+        die ("Unable to create backup\n");
+
+      i += 3;
     } else {
       die (USAGE_STRING "Error: Unknown command\n", argv[0]);
     }

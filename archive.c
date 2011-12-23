@@ -20,6 +20,8 @@
 
 static u8 device_id[0x10] = {0};
 static int device_id_set = FALSE;
+static u8 open_psid[0x10] = {0};
+static int open_psid_set = FALSE;
 const char *keys_conf_path = "keys.conf";
 Key *keys = NULL;
 int num_keys = 0;
@@ -363,9 +365,14 @@ archive_index_write (ArchiveIndex *archive_index, const char *path)
     goto end;
   }
 
-  dat_header.size = 0x40;
+  if (archive_index->header.archive_type == 4) {
+    dat_header.size =  0x30;
+    memset (dat_header.key_seed, 0, 0x14);
+  } else {
+    dat_header.size = 0x40;
+    generate_random_key_seed (dat_header.key_seed);
+  }
   dat_header.type = 0x05;
-  generate_random_key_seed (dat_header.key_seed);
   memset (dat_header.padding, 0, 0x10);
 
   ARCHIVE_DAT_FILE_HEADER_TO_BE (dat_header);
@@ -384,10 +391,6 @@ archive_index_write (ArchiveIndex *archive_index, const char *path)
   paged_file_hash (&file, hmac);
   paged_file_crypt (&file, key, iv);
 
-  archive_index->header.index = 0;
-  archive_index->header.archive_type = 5;
-  archive_index->header.id_type = 1;
-  archive_index->header.padding = 0;
   if (paged_file_write (&file, &archive_index->header, sizeof(archive_index->header)) != sizeof(archive_index->header)) {
     DBG ("Couldn't write archive index header\n");
     goto end;
@@ -409,8 +412,8 @@ archive_index_write (ArchiveIndex *archive_index, const char *path)
     ARCHIVE_FILE_FROM_BE (*archive_file);
   }
   file_eos.eos.zero = 0;
-  file_eos.eos.total_files = TO_BE (64, archive_index->total_files);
-  file_eos.eos.total_file_sizes = TO_BE (64, archive_index->total_file_sizes);
+  file_eos.eos.total_files = archive_index->total_files;
+  file_eos.eos.total_file_sizes = archive_index->total_file_sizes;
 
   ARCHIVE_FILE_EOS_TO_BE (file_eos);
   if (paged_file_write (&file, &file_eos, sizeof(ArchiveFile)) != sizeof(ArchiveFile)) {
@@ -432,7 +435,7 @@ archive_index_write (ArchiveIndex *archive_index, const char *path)
     ARCHIVE_DIRECTORY_FROM_BE (*archive_dir);
   }
   dir_eos.eos.zero = 0;
-  dir_eos.eos.total_dirs = TO_BE (64, archive_index->total_dirs);
+  dir_eos.eos.total_dirs = archive_index->total_dirs;
 
   ARCHIVE_DIRECTORY_EOS_TO_BE (dir_eos);
   if (paged_file_write (&file, &dir_eos, sizeof(ArchiveDirectory)) != sizeof(ArchiveDirectory)) {
@@ -620,7 +623,6 @@ archive_extract_file (const char *path, const char *filename, const char *output
 
   if (archive_find_file (&archive, path, filename, &file, &index, &offset)) {
     ret = archive_extract (&archive, path, index, offset, file->stat.file_size, output);
-    archive_index_free (&archive);
   } else if (device_id_set) {
     ArchiveIndex archive2;
 
@@ -632,8 +634,10 @@ archive_extract_file (const char *path, const char *filename, const char *output
 
     if (archive_find_file (&archive2, path, filename, &file, &index, &offset))
       ret = archive_extract (&archive2, path, index, offset, file->stat.file_size, output);
-      archive_index_free (&archive2);
+    archive_index_free (&archive2);
   }
+
+  archive_index_free (&archive);
 
   return ret;
 }
@@ -1166,10 +1170,93 @@ archive_add (const char *path, const char *game, int protected)
   return TRUE;
 }
 
+int
+archive_create_backup (const char *path, const char *content, const char *protected_content)
+{
+  ArchiveIndex archive = {0};
+  ArchiveIndex archive2 = {0};
+  char filename[1024];
+  u64 archive_id;
+
+  mkdir_recursive (path);
+  get_rand ((u8 *)&archive_id, 8);
+
+  if (protected_content &&
+      protected_content[0] != '-' &&
+      protected_content[0] != 0) {
+    archive2.prefix = "archive2";
+    archive2.header.id = archive_id;
+    archive2.header.index = 0;
+    archive2.header.archive_type = 4;
+    archive2.header.id_type = 1;
+
+    snprintf (filename, sizeof(filename), "%s/%s.dat", path, archive2.prefix);
+    if (!archive_index_write (&archive2, filename))
+      die ("Unable to write index archive\n");
+
+    if (archive_add (path, protected_content, TRUE) == FALSE)
+      return FALSE;
+
+    if (!archive_index_read (&archive2, filename))
+      die ("Unable to read index archive\n");
+  }
+
+  if (content &&
+      content[0] != '-' &&
+      content[0] != 0) {
+    archive.prefix = "archive";
+    archive.header.id = archive_id;
+    archive.header.index = 0;
+    archive.header.archive_type = 5;
+    archive.header.id_type = 1;
+    memcpy (archive.footer.psid, open_psid, 0x10);
+    archive.footer.archive2_size = archive2.total_file_sizes;
+
+    snprintf (filename, sizeof(filename), "%s/%s.dat", path, archive.prefix);
+    if (!archive_index_write (&archive, filename))
+      die ("Unable to write index archive\n");
+
+    if (archive_add (path, content, FALSE) == FALSE)
+      return FALSE;
+  }
+
+  archive_index_free (&archive);
+  archive_index_free (&archive2);
+
+  return TRUE;
+}
+
+int
+archive_delete_protected (const char *path)
+{
+  ArchiveIndex archive;
+  char buffer[1024];
+
+  archive.prefix = "archive";
+  snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive.prefix);
+  if (!archive_index_read (&archive, buffer))
+    die ("Unable to read index archive\n");
+
+  /* TODO: dat_header.type = 3? */
+  archive.footer.archive2_size = 0;
+  if (!archive_index_write (&archive, buffer))
+    die ("Unable to write index archive\n");
+
+  archive_index_free (&archive);
+
+  return TRUE;
+}
 
 int
 archive_set_device_id (const u8 idps[0x10])
 {
   memcpy (device_id, idps, 0x10);
   device_id_set = TRUE;
+}
+
+int
+archive_set_open_psid (const u8 psid[0x10])
+{
+  memcpy (open_psid, psid, 0x10);
+  open_psid_set = TRUE;
 }
