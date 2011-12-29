@@ -1,12 +1,11 @@
-# Makefile.am for ps3tools
-#
-# (C) Youness Alaoui (KaKaRoTo)
+# Makefile.am for ps3xport
 #
 # Licensed under LGPL 2.1. See file COPYING.
 
 ERROR_CFLAGS = \
-	$(PS3TOOLS_CFLAGS) \
+	$(PS3XPORT_CFLAGS) \
 	-fno-strict-aliasing \
+	-Wall \
 	-Wextra \
 	-Wundef \
 	-Wnested-externs \

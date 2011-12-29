@@ -1,6 +1,10 @@
-// 2011 Ninjas
-// Licensed under the terms of the GNU GPL, version 2
-// http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
+/*
+ * Copyright (C) The Freedom League
+ *
+ * This software is distributed under the terms of the GNU General Public
+ * License ("GPL") version 3, as published by the Free Software Foundation.
+ *
+ */
 
 #ifndef __ARCHIVE_H__
 #define __ARCHIVE_H__
@@ -29,7 +33,7 @@ typedef struct {
   u64 ctime;
   u64 file_size;
   u64 block_size;
-} FileStat;
+} __attribute__((packed)) FileStat;
 
 #define ARCHIVE_FILE_STAT_FROM_BE(x)                \
   (x).mode = FROM_BE (32, (x).mode);                \
@@ -54,7 +58,7 @@ typedef struct {
   };
   FileStat stat;
   u32 flags; /* 1 == dev_flash2 */
-} ArchiveFile;
+} __attribute__((packed)) ArchiveFile;
 
 #define ARCHIVE_FILE_FROM_BE(x)                 \
   ARCHIVE_FILE_STAT_FROM_BE ((x).stat);         \
@@ -76,7 +80,7 @@ typedef struct {
   };
   FileStat stat;
   u32 flags; /* must be 1 for normal or 3 for dev_flash2 */
-} ArchiveDirectory;
+} __attribute__((packed)) ArchiveDirectory;
 
 #define ARCHIVE_DIRECTORY_FROM_BE(x)                 \
   ARCHIVE_FILE_STAT_FROM_BE ((x).stat);              \
@@ -93,7 +97,7 @@ typedef struct {
   u8 hash[0x14];
   u8 key_seed[0x14];
   u8 padding[0x10];
-} DatFileHeader;
+} __attribute__((packed)) DatFileHeader;
 
 #define ARCHIVE_DAT_FILE_HEADER_FROM_BE(x)                 \
   (x).size = FROM_LE (32, (x).size);                       \
@@ -107,7 +111,7 @@ typedef struct {
   u8 archive_type; // 4 for copy protected, 5 for normal.
   u8 id_type; // 1 means the archive_id is the current ticks ? 0 means system time ?
   u16 padding;
-} ArchiveHeader;
+} __attribute__((packed)) ArchiveHeader;
 
 #define ARCHIVE_HEADER_FROM_BE(x)               \
   (x).index = FROM_BE (32, (x).index);
@@ -117,7 +121,7 @@ typedef struct {
   u8 psid[0x10];
   u64 archive2_size;
   u64 padding;
-} ArchiveIndexFooter;
+} __attribute__((packed)) ArchiveIndexFooter;
 
 #define ARCHIVE_INDEX_FOOTER_FROM_BE(x)                 \
   (x).archive2_size = FROM_BE (64, (x).archive2_size);

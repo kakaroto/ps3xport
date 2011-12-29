@@ -1,6 +1,10 @@
-// 2011 Ninjas
-// Licensed under the terms of the GNU GPL, version 2
-// http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
+/*
+ * Copyright (C) The Freedom League
+ *
+ * This software is distributed under the terms of the GNU General Public
+ * License ("GPL") version 3, as published by the Free Software Foundation.
+ *
+ */
 
 #include "tools.h"
 #include "types.h"

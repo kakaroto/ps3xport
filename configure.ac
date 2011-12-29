@@ -2,8 +2,8 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.66])
-AC_INIT([ps3tools], [0.1], [])
-AC_CONFIG_SRCDIR([tools.c])
+AC_INIT([ps3xport], [0.1], [])
+AC_CONFIG_SRCDIR([ps3xport.c])
 AC_CONFIG_HEADERS([config.h])
 AM_INIT_AUTOMAKE([-Wall])
 

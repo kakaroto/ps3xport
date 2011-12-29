@@ -1,6 +1,10 @@
-// 2011 Ninjas
-// Licensed under the terms of the GNU GPL, version 2
-// http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
+/*
+ * Copyright (C) The Freedom League
+ *
+ * This software is distributed under the terms of the GNU General Public
+ * License ("GPL") version 3, as published by the Free Software Foundation.
+ *
+ */
 
 #include "tools.h"
 #include "types.h"
@@ -216,7 +220,7 @@ archive_open (const char *path, PagedFile *file, DatFileHeader *dat_header)
   }
 
   paged_file_hash (file, hmac);
-  paged_file_crypt (file, key, iv);
+  paged_file_crypt (file, key, iv, PAGED_FILE_CRYPT_AES_128_CBC, NULL, NULL);
 
   return TRUE;
  end:
@@ -389,7 +393,7 @@ archive_index_write (ArchiveIndex *archive_index, const char *path)
 
   paged_file_flush (&file);
   paged_file_hash (&file, hmac);
-  paged_file_crypt (&file, key, iv);
+  paged_file_crypt (&file, key, iv, PAGED_FILE_CRYPT_AES_128_CBC, NULL, NULL);
 
   if (paged_file_write (&file, &archive_index->header, sizeof(archive_index->header)) != sizeof(archive_index->header)) {
     DBG ("Couldn't write archive index header\n");
@@ -1052,7 +1056,7 @@ archive_add (const char *path, const char *game, int protected)
 
     paged_file_flush (&out);
     paged_file_hash (&out, hmac);
-    paged_file_crypt (&out, key, iv);
+    paged_file_crypt (&out, key, iv, PAGED_FILE_CRYPT_AES_128_CBC, NULL, NULL);
 
     if (paged_file_write (&out, &archive_header, sizeof(archive_header)) != sizeof(archive_header))
       die ("Couldn't write encrypted header\n");
@@ -1093,7 +1097,7 @@ archive_add (const char *path, const char *game, int protected)
 
     paged_file_flush (&out);
     paged_file_hash (&out, hmac);
-    paged_file_crypt (&out, key, iv);
+    paged_file_crypt (&out, key, iv, PAGED_FILE_CRYPT_AES_128_CBC, NULL, NULL);
 
     ARCHIVE_HEADER_TO_BE (archive_header);
     if (paged_file_write (&out, &archive_header, sizeof(archive_header)) != sizeof(archive_header))

@@ -1,6 +1,10 @@
-// 2011 Ninjas
-// Licensed under the terms of the GNU GPL, version 2
-// http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
+/*
+ * Copyright (C) The Freedom League
+ *
+ * This software is distributed under the terms of the GNU General Public
+ * License ("GPL") version 3, as published by the Free Software Foundation.
+ *
+ */
 
 #include "tools.h"
 #include "types.h"
@@ -21,7 +25,10 @@ paged_file_init (PagedFile *f, FILE *fd, int reader)
   f->ptr = malloc (PAGED_FILE_PAGE_SIZE);
   f->size = 0;
   f->pos = 0;
+  f->page_pos = 0;
   f->reader = reader;
+  f->crypt = PAGED_FILE_CRYPT_NONE;
+  f->hash = FALSE;
 
   return TRUE;
 }
@@ -47,26 +54,77 @@ paged_file_hash_internal (PagedFile *f)
 }
 
 static void
+paged_file_crypt_internal_encrypt (PagedFile *f)
+{
+  if (f->size > 0) {
+    if (f->crypt == PAGED_FILE_CRYPT_AES_128_CBC) {
+      aes128cbc_enc (f->key, f->iv, f->ptr, f->size, f->ptr);
+      if (f->size >= 0x10)
+        memcpy (f->iv, f->ptr + f->size - 0x10, 0x10);
+    } else if (f->crypt == PAGED_FILE_CRYPT_AES_256_CBC) {
+      aes256cbc_enc (f->key, f->iv, f->ptr, f->size, f->ptr);
+      if (f->size >= 0x10)
+        memcpy (f->iv, f->ptr + f->size - 0x10, 0x10);
+    } else if (f->crypt == PAGED_FILE_CRYPT_AES_128_CTR) {
+      aes128ctr (f->key, f->iv, f->ptr, f->size, f->ptr);
+    } else if (f->crypt == PAGED_FILE_CRYPT_CUSTOM) {
+      f->crypt_cb (f, PAGED_FILE_CRYPT_ENCRYPT, f->ptr, f->size,
+          f->crypt_cb_data);
+    }
+  }
+}
+
+static void
+paged_file_crypt_internal_decrypt (PagedFile *f)
+{
+  if (f->size - f->pos > 0) {
+    if (f->crypt == PAGED_FILE_CRYPT_AES_128_CBC) {
+      u8 iv[0x10];
+
+      memcpy (iv, f->iv, 0x10);
+      if ((f->size - f->pos) >= 0x10)
+        memcpy (f->iv, f->ptr + f->size - 0x10, 0x10);
+      aes128cbc (f->key, iv, f->ptr + f->pos, f->size - f->pos,
+          f->ptr + f->pos);
+    } else if (f->crypt == PAGED_FILE_CRYPT_AES_256_CBC) {
+      u8 iv[0x10];
+
+      memcpy (iv, f->iv, 0x10);
+      if ((f->size - f->pos) >= 0x10)
+        memcpy (f->iv, f->ptr + f->size - 0x10, 0x10);
+      aes256cbc (f->key, iv, f->ptr + f->pos, f->size - f->pos, f->ptr + f->pos);
+    } else if (f->crypt == PAGED_FILE_CRYPT_AES_128_CTR) {
+      aes128ctr (f->key, f->iv, f->ptr + f->pos, f->size - f->pos, f->ptr + f->pos);
+    } else if (f->crypt == PAGED_FILE_CRYPT_CUSTOM) {
+      f->crypt_cb (f, PAGED_FILE_CRYPT_DECRYPT, f->ptr + f->pos,
+          f->size - f->pos, f->crypt_cb_data);
+    }
+  }
+}
+
+static void
 paged_file_crypt_internal (PagedFile *f)
 {
-  if (f->crypt && (f->size - f->pos) > 0) {
-    u8 iv[0x10];
-    memcpy (iv, f->iv, 0x10);
-    if ((f->size - f->pos) >= 0x10) /* FIXME: not perfect */
-      memcpy (f->iv, f->ptr + f->size - 0x10, 0x10);
-    aes128cbc (f->key, iv, f->ptr + f->pos, f->size - f->pos, f->ptr + f->pos);
+  if (f->reader) {
+    paged_file_crypt_internal_decrypt (f);
+  } else {
+    paged_file_crypt_internal_encrypt (f);
   }
 }
 
 int
-paged_file_crypt (PagedFile *f, u8 *key, u8 *iv)
+paged_file_crypt (PagedFile *f, u8 *key, u8 *iv, PagedFileCryptType type,
+    PagedFileCryptCB callback, void *user_data)
 {
-  if (f->crypt)
+  if (f->crypt != PAGED_FILE_CRYPT_NONE)
     return FALSE;
 
   memcpy (f->key, key, 0x10);
   memcpy (f->iv, iv, 0x10);
-  f->crypt = TRUE;
+  f->crypt = type;
+  f->crypt_cb = callback;
+  f->crypt_cb_data = user_data;
+
   paged_file_crypt_internal (f);
 
   return TRUE;
@@ -92,6 +150,7 @@ paged_file_read_new_page (PagedFile *f)
   if (!f->reader)
     return -1;
 
+  f->page_pos += f->size;
   f->size = fread (f->ptr, 1, 0x1000, f->fd);
   f->pos = 0;
 
@@ -144,15 +203,12 @@ paged_file_flush (PagedFile *f)
   if (f->size == 0)
     return 0;
 
-  if (f->crypt) {
-    aes128cbc_enc (f->key, f->iv, f->ptr, f->size, f->ptr);
-    if (f->size >= 0x10)
-      memcpy (f->iv, f->ptr + f->size - 0x10, 0x10);
-  }
+  paged_file_crypt_internal (f);
   f->pos = 0;
   paged_file_hash_internal (f);
 
   written = fwrite (f->ptr, 1, f->size, f->fd);
+  f->page_pos += f->size;
   f->size = 0;
 
   return written;
@@ -201,16 +257,42 @@ paged_file_seek (PagedFile *f, u64 offset)
   pos = offset % 0x10;
   offset &= ~0xF;
 
-  if (f->crypt && offset >= 0x10) {
-    fseek (f->fd, offset - 0x10, SEEK_SET);
-    if (fread (f->iv, 1, 0x10, f->fd) != 1)
-      return -1;
+  if (offset + pos > f->page_pos && offset + pos < f->page_pos + f->size) {
+    f->pos = offset + pos - f->page_pos;
+    return f->page_pos + f->pos;
+  }
+
+  if (f->crypt != PAGED_FILE_CRYPT_NONE) {
+    /* TODO: support other crypto */
+    if (f->crypt == PAGED_FILE_CRYPT_AES_128_CBC ||
+        f->crypt == PAGED_FILE_CRYPT_AES_256_CBC) {
+      if (offset >= 0x10) {
+        fseek (f->fd, offset - 0x10, SEEK_SET);
+        if (fread (f->iv, 1, 0x10, f->fd) != 1)
+          return -1;
+      }
+    } else if (f->crypt == PAGED_FILE_CRYPT_AES_128_CTR) {
+      s64 seek_diff = (signed) (offset - (f->page_pos + f->size)) / 0x10;
+      u64 tmp = be64(f->iv + 8) + seek_diff;
+
+      if (seek_diff > 0 && tmp < be64 (f->iv + 8))
+        wbe64(f->iv, be64(f->iv) + 1);
+      else if (seek_diff < 0 && tmp > be64 (f->iv + 8))
+        wbe64(f->iv, be64(f->iv) - 1);
+      wbe64(f->iv + 8, tmp);
+    } else if (f->crypt == PAGED_FILE_CRYPT_CUSTOM) {
+      if (!f->crypt_cb (f, PAGED_FILE_CRYPT_SEEK,
+              NULL, offset, f->crypt_cb_data))
+        return -1;
+    }
   }
   fseek (f->fd, offset, SEEK_SET);
+  f->size = 0;
+  f->page_pos = ftell (f->fd);
   paged_file_read_new_page (f);
   f->pos = pos;
 
-  return ftell (f->fd);
+  return f->page_pos;
 }
 
 int

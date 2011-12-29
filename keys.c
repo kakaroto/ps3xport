@@ -1,6 +1,11 @@
-// Copyright 2011            Code Monkeys
-// Licensed under the terms of the GNU GPL, version 2
-// http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
+/*
+ * Copyright (C) The Freedom League
+ *
+ * This software is distributed under the terms of the GNU General Public
+ * License ("GPL") version 3, as published by the Free Software Foundation.
+ *
+ */
+
 
 #include "keys.h"
 #include "tools.h"
@@ -63,23 +68,7 @@ keys_load_from_file (const char *filename, int *num_keys)
       memcpy (current_key->version, "1.00", 4);
       current_key->name = strdup (v);
     } else if (strcmp (k, "type") == 0) {
-      if (strcmp (v, "metldr") == 0) {
-        current_key->type = KEY_TYPE_METLDR;
-      } else if (strcmp (v, "lv1") == 0) {
-        current_key->type = KEY_TYPE_LV1;
-      } else if (strcmp (v, "lv2") == 0) {
-        current_key->type = KEY_TYPE_LV2;
-      } else if (strcmp (v, "iso") == 0) {
-        current_key->type = KEY_TYPE_ISO;
-      } else if (strcmp (v, "app") == 0) {
-        current_key->type = KEY_TYPE_APP;
-      } else if (strcmp (v, "npdrm") == 0) {
-        current_key->type = KEY_TYPE_NPDRM;
-      } else if (strcmp (v, "sc") == 0) {
-        current_key->type = KEY_TYPE_SC;
-      } else {
-        goto error;
-      }
+      current_key->type = strdup (v);
     } else if (strcmp (k, "version") == 0) {
       if (strlen (v) == 4)
         memcpy (current_key->version, v, 4);
@@ -123,12 +112,13 @@ keys_find_by_name (Key *keys, int num_keys, const char *name)
 }
 
 Key *
-keys_find_by_revision (Key *keys, int num_keys, KeyType type, u32 revision)
+keys_find_by_revision (Key *keys, int num_keys, const char *type, u32 revision)
 {
   int i;
 
   for (i = 0; i < num_keys; i++) {
-    if (keys[i].type == type && keys[i].revision == revision)
+    if (strcmp (keys[i].type, type) == 0 &&
+        keys[i].revision == revision)
       return &keys[i];
   }
   return NULL;
