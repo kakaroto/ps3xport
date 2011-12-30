@@ -15,7 +15,6 @@
 
 extern Key *keys;
 extern int num_keys;
-extern const char *keys_conf_path;
 
 typedef struct _ChainedList ChainedList;
 struct _ChainedList {

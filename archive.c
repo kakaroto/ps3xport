@@ -26,7 +26,6 @@ static u8 device_id[0x10] = {0};
 static int device_id_set = FALSE;
 static u8 open_psid[0x10] = {0};
 static int open_psid_set = FALSE;
-const char *keys_conf_path = "keys.conf";
 Key *keys = NULL;
 int num_keys = 0;
 
@@ -145,9 +144,9 @@ sc_encrypt (u32 type, u8 *laid_paid, u8 *iv, u8 *in, u32 in_size, u8 *out)
     die ("sc_encrypt: Invalid key type\n");
 
   if (keys == NULL) {
-    keys = keys_load_from_file (keys_conf_path, &num_keys);
+    keys = keys_load (&num_keys);
     if (keys == NULL)
-      die ("Unable to load necessary keys from : %s\n", keys_conf_path);
+      die ("Unable to load necessary keys from\n");
   }
 
   sc_key = keys_find_by_revision (keys, num_keys, KEY_TYPE_SC, type);

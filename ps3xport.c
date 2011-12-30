@@ -85,7 +85,7 @@ main (int argc, char *argv[])
       /* SetKeysFile filename */
       if (i + 1 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
-      keys_conf_path = argv[++i];
+      keys_set_path (argv[++i]);
     } else if (strcmp (argv[i], "SetDeviceID") == 0 ||
         strcmp (argv[i], "SetPSID") == 0) {
       /* SetDeviceID (HEX|filename) */

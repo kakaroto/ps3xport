@@ -42,9 +42,11 @@ typedef struct {
   u32 ctype;
 } Key;
 
+Key *keys_load (int *num_keys);
 Key *keys_load_from_file (const char *filename, int *num_keys);
 Key *keys_find_by_name (Key *keys, int num_keys, const char *name);
 Key *keys_find_by_revision (Key *keys, int num_keys, const char *type, u32 revision);
 void keys_free (Key *keys, int num_keys);
+void keys_set_path (const char *path);
 
 #endif /* __KEYS_H__ */

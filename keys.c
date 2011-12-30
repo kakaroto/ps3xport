@@ -14,6 +14,9 @@
 #include <string.h>
 #include "paged_file.h"
 
+#define DEFAULT_KEYS_CONF_PATH "keys.conf"
+static char *keys_conf_path = NULL;
+
 #define parse_key(where)                        \
   int len = strlen (v);                         \
                                                 \
@@ -22,6 +25,45 @@
   current_key->where = malloc (len / 2);                        \
   if (parse_hex (v, current_key->where, len / 2) != len / 2)    \
     goto error;
+
+void
+keys_set_path (const char *path)
+{
+  if (keys_conf_path)
+    free (keys_conf_path);
+  keys_conf_path = strdup (path);
+}
+
+Key *
+keys_load (int *num_keys)
+{
+  Key *keys = NULL;
+
+  if (keys_conf_path)
+    keys = keys_load_from_file (keys_conf_path, num_keys);
+  else
+    keys = keys_load_from_file (DEFAULT_KEYS_CONF_PATH, num_keys);
+
+  if (keys == NULL) {
+    char buffer[1024];
+    const char *path = getenv ("PS3_KEYS_PATH");
+
+    if (path) {
+      snprintf (buffer, sizeof(buffer), "%s/keys.conf", path);
+      keys = keys_load_from_file (buffer, num_keys);
+    }
+    if (keys == NULL) {
+      path = getenv ("HOME");
+
+      if (path) {
+        snprintf (buffer, sizeof(buffer), "%s/.ps3/keys.conf", path);
+        keys = keys_load_from_file (buffer, num_keys);
+      }
+    }
+  }
+
+  return keys;
+}
 
 Key *
 keys_load_from_file (const char *filename, int *num_keys)
