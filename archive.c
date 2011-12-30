@@ -208,8 +208,8 @@ archive_open (const char *path, PagedFile *file, DatFileHeader *dat_header)
     goto end;
   }
 
-  if (dat_header->type != 5) {
-    DBG ("Header type must be 5, not : %X\n", dat_header->type);
+  if (dat_header->type != 5 && dat_header->type != 3) {
+    DBG ("Header type must be 5 or 3, not : %X\n", dat_header->type);
     goto end;
   }
 
