@@ -507,7 +507,7 @@ archive_data_read (ArchiveData *archive_data, const char *path)
     goto end;
   }
 
-  if (paged_file_read (&file, &archive_data, sizeof(archive_data)) != sizeof(archive_data)) {
+  if (paged_file_read (&file, &archive_data->header, sizeof(ArchiveHeader)) != sizeof(ArchiveHeader)) {
     DBG ("Couldn't read encrypted header\n");
     goto end;
   }
