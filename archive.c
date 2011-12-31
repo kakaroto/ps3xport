@@ -981,7 +981,7 @@ archive_add (const char *path, const char *game, int protected)
   FILE *fd = NULL;
   DIR *dir_fd = NULL;
   u32 total_file_size = 0;
-  int new_file = TRUE;
+  int new_file = FALSE;
   u8 key[0x10];
   u8 iv[0x10];
   u8 hmac[0x40];
