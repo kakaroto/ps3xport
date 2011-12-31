@@ -248,9 +248,6 @@ main (int argc, char *argv[])
       i += 2;
     } else if (strcasecmp (argv[i], "AddProtected") == 0) {
       /* AddProtected backup_dir directory */
-      ArchiveIndex archive;
-      ArchiveIndex archive2;
-      char path[1024];
 
       if (i + 2 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
@@ -259,21 +256,6 @@ main (int argc, char *argv[])
       if (!archive_add (argv[i+1], argv[i+2], TRUE))
         die ("Error adding directory to backup!\n");
 
-      /* Read archive2.dat and archive.dat */
-      snprintf (path, sizeof(path), "%s/archive2.dat", argv[i+1]);
-      if (!archive_index_read (&archive2, path))
-        die ("Error parsing archive index!\n");
-      snprintf (path, sizeof(path), "%s/archive.dat", argv[i+1]);
-      if (!archive_index_read (&archive, path))
-        die ("Error parsing archive index!\n");
-
-      /* Fix the footer from archive.dat */
-      archive.footer.archive2_size = archive.total_file_sizes;
-      if (!archive_index_write (&archive, path))
-        die ("Error parsing archive index!\n");
-
-      archive_index_free (&archive);
-      archive_index_free (&archive2);
       i += 2;
     } else if (strcasecmp (argv[i], "CreateBackup") == 0) {
       /* ExtractFile backup_dir filename destination */

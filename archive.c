@@ -368,14 +368,16 @@ archive_index_write (ArchiveIndex *archive_index, const char *path)
     goto end;
   }
 
+  dat_header.type = 0x05;
   if (archive_index->header.archive_type == 4) {
     dat_header.size =  0x30;
     memset (dat_header.key_seed, 0, 0x14);
   } else {
+    if (archive_index->footer.archive2_size == 0)
+      dat_header.type = 0x03;
     dat_header.size = 0x40;
     generate_random_key_seed (dat_header.key_seed);
   }
-  dat_header.type = 0x05;
   memset (dat_header.padding, 0, 0x10);
 
   ARCHIVE_DAT_FILE_HEADER_TO_BE (dat_header);
@@ -967,7 +969,8 @@ archive_add (const char *path, const char *game, int protected)
 {
   ChainedList *list = NULL;
   char buffer[0x10000];
-  ArchiveIndex archive_index;
+  ArchiveIndex archive = {0};
+  ArchiveIndex archive_index = {0};
   DatFileHeader dat_header;
   ArchiveHeader archive_header;
   ChainedList *dirs = NULL;
@@ -983,8 +986,6 @@ archive_add (const char *path, const char *game, int protected)
   u8 iv[0x10];
   u8 hmac[0x40];
 
-
-
   if (protected)
     archive_index.prefix = "archive2";
   else
@@ -997,9 +998,26 @@ archive_add (const char *path, const char *game, int protected)
   populate_dirlist (&dirs, &files, game, "", dir_fd);
   closedir (dir_fd);
 
+  if (protected) {
+    archive.prefix = "archive";
+    snprintf (buffer, sizeof(buffer), "%s/archive.dat", path);
+    if (!archive_index_read (&archive, buffer))
+      die ("Unable to read main index archive\n");
+  }
+
   snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive_index.prefix);
-  if (!archive_index_read (&archive_index, buffer))
-    die ("Unable to read index archive\n");
+  if (!file_exists (buffer)) {
+    if (!protected)
+      die ("Invalid backup directory, call CreateBackup if you need to create one\n");
+
+    archive_index.header.id = archive.header.id;
+    archive_index.header.index = 0;
+    archive_index.header.archive_type = 4;
+    archive_index.header.id_type = 1;
+  } else {
+    if (!archive_index_read (&archive_index, buffer))
+      die ("Unable to read index archive\n");
+  }
 
   for (list = dirs; list; list = list->next) {
     ArchiveDirectory *dir = list->data;
@@ -1159,6 +1177,13 @@ archive_add (const char *path, const char *game, int protected)
   if (!archive_index_write (&archive_index, buffer))
     die ("Unable to write index archive\n");
 
+  if (protected) {
+    archive.footer.archive2_size = archive_index.total_file_sizes;
+    snprintf (buffer, 0x500, "%s/%s.dat", path, archive.prefix);
+    archive_index_write (&archive, buffer);
+  }
+
+  archive_index_free (&archive);
   archive_index_free (&archive_index);
 
   return TRUE;
@@ -1174,6 +1199,29 @@ archive_create_backup (const char *path, const char *content, const char *protec
 
   mkdir_recursive (path);
   get_rand ((u8 *)&archive_id, 8);
+
+  archive.prefix = "archive";
+  archive.header.id = archive_id;
+  archive.header.index = 0;
+  archive.header.archive_type = 5;
+  archive.header.id_type = 1;
+  memcpy (archive.footer.psid, open_psid, 0x10);
+  archive.footer.archive2_size = 0;
+
+  snprintf (filename, sizeof(filename), "%s/%s.dat", path, archive.prefix);
+  if (!archive_index_write (&archive, filename))
+    die ("Unable to write index archive\n");
+
+  if (content &&
+      content[0] != 0 &&
+      (content[0] != '-' || content[1] != 0) ) {
+
+    if (archive_add (path, content, FALSE) == FALSE)
+      return FALSE;
+    snprintf (filename, sizeof(filename), "%s/%s.bak", path, archive.prefix);
+    remove (filename);
+  }
+
 
   if (protected_content &&
       protected_content[0] != 0 &&
@@ -1198,36 +1246,8 @@ archive_create_backup (const char *path, const char *content, const char *protec
     remove (filename);
   }
 
-  if (content &&
-      content[0] != 0 &&
-      (content[0] != '-' || content[1] != 0) ) {
-    archive.prefix = "archive";
-    archive.header.id = archive_id;
-    archive.header.index = 0;
-    archive.header.archive_type = 5;
-    archive.header.id_type = 1;
-    memcpy (archive.footer.psid, open_psid, 0x10);
-    archive.footer.archive2_size = archive2.total_file_sizes;
-
-    snprintf (filename, sizeof(filename), "%s/%s.dat", path, archive.prefix);
-    if (!archive_index_write (&archive, filename))
-      die ("Unable to write index archive\n");
-
-    if (archive_add (path, content, FALSE) == FALSE)
-      return FALSE;
-
-    snprintf (filename, sizeof(filename), "%s/%s.bak", path, archive.prefix);
-    remove (filename);
-  }
-
   archive_index_free (&archive);
   archive_index_free (&archive2);
-
-  if (protected_content == NULL ||
-      protected_content[0] == 0 ||
-      (protected_content[0] == '-' &&
-          protected_content[1] == 0))
-    archive_delete_protected (path);
 
   return TRUE;
 }
