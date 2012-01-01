@@ -64,12 +64,32 @@
 static void
 archive_print_dir (ArchiveDirectory *dir, char *prefix)
 {
-  printf ("%s%s\n", prefix, dir->path);
+  printf ("%s d%c%c%c%c%c%c%c%c%c %s\n", prefix,
+      dir->stat.mode & 0400 ? 'r' : '-',
+      dir->stat.mode & 0200 ? 'w' : '-',
+      dir->stat.mode & 0100 ? 'x' : '-',
+      dir->stat.mode & 040 ? 'r' : '-',
+      dir->stat.mode & 020 ? 'w' : '-',
+      dir->stat.mode & 010 ? 'x' : '-',
+      dir->stat.mode & 04 ? 'r' : '-',
+      dir->stat.mode & 02 ? 'w' : '-',
+      dir->stat.mode & 01 ? 'x' : '-',
+      dir->path);
 }
 static void
 archive_print_file (ArchiveFile *file, char *prefix)
 {
-  printf ("%s%s\n", prefix, file->path);
+  printf ("%s -%c%c%c%c%c%c%c%c%c %10llu %s\n", prefix,
+      file->stat.mode & 0400 ? 'r' : '-',
+      file->stat.mode & 0200 ? 'w' : '-',
+      file->stat.mode & 0100 ? 'x' : '-',
+      file->stat.mode & 040 ? 'r' : '-',
+      file->stat.mode & 020 ? 'w' : '-',
+      file->stat.mode & 010 ? 'x' : '-',
+      file->stat.mode & 04 ? 'r' : '-',
+      file->stat.mode & 02 ? 'w' : '-',
+      file->stat.mode & 01 ? 'x' : '-',
+      file->stat.file_size, file->path);
 }
 
 int

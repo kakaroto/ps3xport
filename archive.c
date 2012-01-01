@@ -1148,6 +1148,7 @@ archive_add (const char *path, const char *game, int protected)
     ArchiveFile *file = list->data;
 
     if (chained_list_contains_string (archive_index.files, file->path)) {
+      fprintf (stderr, "Ignoring already existing file %s\n", file->path);
       free (file);
       continue;
     }
