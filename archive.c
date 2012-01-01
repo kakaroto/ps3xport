@@ -904,11 +904,12 @@ chained_list_contains_string (ChainedList *list, const char *string)
 
 static void
 populate_dirlist (ChainedList **dirs, ChainedList **files,
-    const char *base, const char *subdir, DIR *fd)
+    const char *base, const char *subdir, DIR *fd, int protected)
 {
   struct dirent *dirent = NULL;
   struct stat stat_buf;
   char path[1024];
+  int dev_flash2;
 
   while (1) {
     dirent = readdir (fd);
@@ -917,6 +918,7 @@ populate_dirlist (ChainedList **dirs, ChainedList **files,
     if (strcmp (dirent->d_name, ".") == 0 ||
         strcmp (dirent->d_name, "..") == 0)
       continue;
+
     DBG ("Found %s : %s/%s\n", dirent->d_type == DT_DIR ? "directory" : "file" ,
         subdir, dirent->d_name);
     if (dirent->d_type == DT_DIR) {
@@ -927,38 +929,54 @@ populate_dirlist (ChainedList **dirs, ChainedList **files,
       snprintf (archive_dir->path, sizeof(archive_dir->path), "%s/%s",
           subdir, dirent->d_name);
       stat (path, &stat_buf);
-      archive_dir->stat.mode = 0x41c0;
+
+      dev_flash2 = strncmp (archive_dir->path, "/dev_flash2", 11) == 0;
+      if (strcmp (archive_dir->path, "/dev_hdd0/game") == 0)
+        archive_dir->stat.mode = 0x41ED;
+      else if (strncmp (archive_dir->path, "/dev_hdd0/game/", 15) ==0)
+        archive_dir->stat.mode = 0x41FF;
+      else if (dev_flash2)
+        archive_dir->stat.mode = 0x41C9;
+      else
+        archive_dir->stat.mode = 0x41C0;
+
       archive_dir->stat.uid = 0;
-      archive_dir->stat.gid = -1;
+      archive_dir->stat.gid = dev_flash2 ? 0 : -1;
       archive_dir->stat.atime = stat_buf.st_atime;
       archive_dir->stat.mtime = stat_buf.st_mtime;
       archive_dir->stat.ctime = stat_buf.st_ctime;
       archive_dir->stat.file_size = 0x200;
       archive_dir->stat.block_size = 0x200;
-      archive_dir->flags = 1;
+      archive_dir->flags = dev_flash2 ? 2 : (protected ? 0 : 1);
       *dirs = chained_list_append (*dirs, archive_dir);
 
       dir_fd = opendir(path);
       if (!dir_fd)
         die ("Unable to open subdir\n");
-      populate_dirlist (dirs, files, base, archive_dir->path, dir_fd);
+      populate_dirlist (dirs, files, base, archive_dir->path, dir_fd, protected);
       closedir (dir_fd);
     } else {
       ArchiveFile *archive_file = malloc (sizeof(ArchiveFile));
 
       snprintf (path, sizeof(path), "%s/%s/%s", base, subdir, dirent->d_name);
-      stat (path, &stat_buf);
       snprintf (archive_file->path, sizeof(archive_file->path), "%s/%s",
           subdir, dirent->d_name);
-      archive_file->stat.mode = 0x8180;
+      stat (path, &stat_buf);
+
+      dev_flash2 = strncmp (archive_file->path, "/dev_flash2", 11) == 0;
+      if (strncmp (archive_file->path, "/dev_hdd0/game/", 15) ==0)
+        archive_file->stat.mode = 0x81B6;
+      else
+        archive_file->stat.mode = 0x8180;
+
       archive_file->stat.uid = 0;
-      archive_file->stat.gid = -1;
+      archive_file->stat.gid = dev_flash2 ? 0 : -1;
       archive_file->stat.atime = stat_buf.st_atime;
       archive_file->stat.mtime = stat_buf.st_mtime;
       archive_file->stat.ctime = stat_buf.st_ctime;
       archive_file->stat.file_size = stat_buf.st_size;
       archive_file->stat.block_size = 0x200;
-      archive_file->flags = 0;
+      archive_file->flags = dev_flash2 ? 1 : 0;
       *files = chained_list_append (*files, archive_file);
     }
   }
@@ -995,7 +1013,7 @@ archive_add (const char *path, const char *game, int protected)
   if (!dir_fd)
     die ("Unable to open game dir\n");
 
-  populate_dirlist (&dirs, &files, game, "", dir_fd);
+  populate_dirlist (&dirs, &files, game, "", dir_fd, protected);
   closedir (dir_fd);
 
   if (protected) {
@@ -1023,6 +1041,7 @@ archive_add (const char *path, const char *game, int protected)
     ArchiveDirectory *dir = list->data;
 
     if (strcmp (dir->path, "/dev_hdd0") == 0 ||
+        strcmp (dir->path, "/dev_flash2") == 0 ||
         chained_list_contains_string (archive_index.dirs, dir->path)) {
       free (dir);
       continue;
