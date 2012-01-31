@@ -9,7 +9,6 @@
 #include "tools.h"
 #include "types.h"
 #include "common.h"
-#include "keys.h"
 
 #include "paged_file.h"
 #include "archive.h"
@@ -26,9 +25,6 @@ static u8 device_id[0x10] = {0};
 static int device_id_set = FALSE;
 static u8 open_psid[0x10] = {0};
 static int open_psid_set = FALSE;
-Key *keys = NULL;
-int num_keys = 0;
-
 
 ChainedList *
 chained_list_append (ChainedList *list, void *data)
@@ -78,86 +74,6 @@ generate_random_key_seed (u8 *seed)
   get_rand (seed, 0x14);
 }
 
-static void sc_encrypt (u32 type, u8 *laid_paid, u8 *iv, u8 *in, u32 in_size, u8 *out);
-
-static void
-vtrm_encrypt_with_portability (u32 type, u8 *buffer, u8 *iv)
-{
-  u32 real_type;
-  u8 laid_paid[16] = {0};
-
-  switch ( type )
-  {
-    case 0:
-      real_type = 1;
-      break;
-    case 3:
-      real_type = 5;
-      break;
-    case 1:
-      real_type = 3;
-      break;
-    case 2:
-      real_type = 2;
-      break;
-    default:
-      die ("vtrm_encrypt_with_portability Unknown method\n");
-      break;
-  }
-  sc_encrypt (real_type, laid_paid, iv, buffer, 0x40, buffer);
-}
-
-static void
-vtrm_encrypt (u32 type, u8 *buffer, u8 *iv)
-{
-  u64 laid_paid[2];
-
-  laid_paid[0] = TO_BE (64, 0x1070000002000001ULL);
-  switch ( type )
-  {
-    case 0:
-      laid_paid[0] = laid_paid[1] = -1;
-      break;
-    case 1:
-      laid_paid[1] = TO_BE (64, 0x1070000000000001ULL);
-      break;
-    case 2:
-      laid_paid[1] = 0;
-    case 3:
-      laid_paid[1] = TO_BE (64, 0x10700003FF000001ULL);
-      break;
-    default:
-      die ("vtrm_encrypt Unknown method\n");
-      break;
-  }
-  sc_encrypt (3, (u8 *)laid_paid, iv, buffer, 0x40, buffer);
-}
-
-static void
-sc_encrypt (u32 type, u8 *laid_paid, u8 *iv, u8 *in, u32 in_size, u8 *out)
-{
-  Key *sc_key;
-  u8 key[16];
-  int i;
-
-  if (type > 5)
-    die ("sc_encrypt: Invalid key type\n");
-
-  if (keys == NULL) {
-    keys = keys_load (&num_keys);
-    if (keys == NULL)
-      die ("Unable to load necessary keys from\n");
-  }
-
-  sc_key = keys_find_by_revision (keys, num_keys, KEY_TYPE_SC, type);
-  if (sc_key == NULL)
-      die ("sc_encrypt: Unknown key\n");
-
-  memcpy (key, sc_key->key, 16);
-  for (i = 0; i < 16; i++)
-    key[i] ^= laid_paid[i];
-  aes128cbc_enc (key, iv, in, in_size, out);
-}
 
 static int
 archive_gen_keys (DatFileHeader *header, u8 *key, u8 *iv, u8 *hmac)

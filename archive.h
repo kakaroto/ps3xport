@@ -12,9 +12,7 @@
 #include "tools.h"
 #include "types.h"
 #include "common.h"
-
-extern Key *keys;
-extern int num_keys;
+#include "vtrm.h"
 
 typedef struct _ChainedList ChainedList;
 struct _ChainedList {
