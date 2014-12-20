@@ -74,7 +74,10 @@ generate_random_key_seed (u8 *seed)
   get_rand (seed, 0x14);
 }
 
-
+/**
+ * The archive is encrypted and we need to generate the keys by either
+ * using the device id (IDP) or the key seed in the archive header
+ */
 static int
 archive_gen_keys (DatFileHeader *header, u8 *key, u8 *iv, u8 *hmac)
 {
@@ -83,7 +86,7 @@ archive_gen_keys (DatFileHeader *header, u8 *key, u8 *iv, u8 *hmac)
 
   memset (buffer, 0, 0x40);
   memset (zero_iv, 0, 0x10);
-  if (header->size == 0x30) {
+  if (header->encryption_type == ENCRYPTION_TYPE_IDP) {
     if (!device_id_set)
       die ("Device ID is not set. You must set it with the command SetDeviceID\n");
     memcpy (buffer, device_id, 0x10);
@@ -119,12 +122,15 @@ archive_open (const char *path, PagedFile *file, DatFileHeader *dat_header)
   }
   ARCHIVE_DAT_FILE_HEADER_FROM_BE (*dat_header);
 
-  if (dat_header->size != 0x40 && dat_header->size != 0x30) {
-    DBG ("Invalid dat header size : %X\n", dat_header->size);
+  // encryption type is either 0x40 (includes a key seed) or 0x30 (uses IDP as key seed)
+  if (dat_header->encryption_type != ENCRYPTION_TYPE_KEYSEED &&
+      dat_header->encryption_type != ENCRYPTION_TYPE_IDP) {
+    DBG ("Invalid dat encryption type : %X\n", dat_header->encryption_type);
     goto end;
   }
 
-  if (dat_header->type != 5 && dat_header->type != 3) {
+  if (dat_header->dat_type != DAT_TYPE_WITH_PROTECTED_ARCHIVE &&
+      dat_header->dat_type != DAT_TYPE_NO_PROTECTED_ARCHIVE) {
     DBG ("Header type must be 5 or 3, not : %X\n", dat_header->type);
     goto end;
   }
@@ -163,10 +169,12 @@ archive_decrypt (const char *path, const char *to)
     goto end;
   }
 
+  // Write the header that was read by archive_open()
   ARCHIVE_DAT_FILE_HEADER_TO_BE (dat_header);
   fwrite (&dat_header, sizeof(dat_header), 1, fd);
   ARCHIVE_DAT_FILE_HEADER_FROM_BE (dat_header);
 
+  // Then decrypt (automatically with paged_file_read) and write to file
   do {
     u8 buffer[1024];
     read = paged_file_read (&file, buffer, sizeof(buffer));
@@ -203,18 +211,21 @@ archive_index_read (ArchiveIndex *archive_index, const char *path)
     goto end;
   }
 
+  // Read the archive header
   if (paged_file_read (&file, &archive_index->header, sizeof(archive_index->header)) != sizeof(archive_index->header)) {
     DBG ("Couldn't read archive encrypted header\n");
     goto end;
   }
   ARCHIVE_HEADER_FROM_BE (archive_index->header);
 
+  // Read all the file list until the EOS file block
   while(1) {
     ArchiveFile *archive_file = malloc (sizeof(ArchiveFile));
     if (paged_file_read (&file, archive_file, sizeof(ArchiveFile)) != sizeof(ArchiveFile)) {
       DBG ("Couldn't read file entry\n");
       goto end;
     }
+    // Found the last file
     if (archive_file->eos.zero == 0) {
       ARCHIVE_FILE_EOS_FROM_BE (*archive_file);
       archive_index->total_files = archive_file->eos.total_files;
@@ -226,12 +237,14 @@ archive_index_read (ArchiveIndex *archive_index, const char *path)
     archive_index->files = chained_list_append (archive_index->files, archive_file);
     DBG ("File : %s\n", archive_file->path);
   }
+  // Read all the directory list until EOS directory block
   while(1) {
     ArchiveDirectory *archive_dir = malloc (sizeof(ArchiveDirectory));
     if (paged_file_read (&file, archive_dir, sizeof(ArchiveDirectory)) != sizeof(ArchiveDirectory)) {
       DBG ("Couldn't read directory entry\n");
       goto end;
     }
+    // Found last directory
     if (archive_dir->eos.zero == 0) {
       ARCHIVE_DIRECTORY_EOS_FROM_BE (*archive_dir);
       archive_index->total_dirs = archive_dir->eos.total_dirs;
@@ -243,7 +256,8 @@ archive_index_read (ArchiveIndex *archive_index, const char *path)
     DBG ("Directory : %s\n", archive_dir->path);
   }
 
-  if (archive_index->header.archive_type == 5) {
+  // Read the footer for the non-protected archive index only
+  if (archive_index->header.archive_type == ARCHIVE_TYPE_NORMAL_CONTENT) {
     if (paged_file_read (&file, &archive_index->footer, sizeof(archive_index->footer)) != sizeof(archive_index->footer)) {
       DBG ("Couldn't read index archive footer\n");
       goto end;
@@ -284,14 +298,16 @@ archive_index_write (ArchiveIndex *archive_index, const char *path)
     goto end;
   }
 
-  dat_header.type = 0x05;
-  if (archive_index->header.archive_type == 4) {
-    dat_header.size =  0x30;
+  dat_header.dat_type = DAT_TYPE_WITH_PROTECTED_ARCHIVE;
+  if (archive_index->header.archive_type == ARCHIVE_TYPE_PROTECTED_CONTENT) {
+    dat_header.encryption_type =  ENCRYPTION_TYPE_IDP;
     memset (dat_header.key_seed, 0, 0x14);
   } else {
+    // If there is no copy-protected content, set type to 3 to avoid a warning
     if (archive_index->footer.archive2_size == 0)
-      dat_header.type = 0x03;
-    dat_header.size = 0x40;
+      dat_header.dat_type = DAT_TYPE_NO_PROTECTED_ARCHIVE;
+
+    dat_header.encryption_type = ENCRYPTION_TYPE_KEYSEED;
     generate_random_key_seed (dat_header.key_seed);
   }
   memset (dat_header.padding, 0, 0x10);
@@ -308,6 +324,7 @@ archive_index_write (ArchiveIndex *archive_index, const char *path)
     goto end;
   }
 
+  // Flush the dat header before we enable hmac hashing and encryption
   paged_file_flush (&file);
   paged_file_hash (&file, hmac);
   paged_file_crypt (&file, key, iv, PAGED_FILE_CRYPT_AES_128_CBC, NULL, NULL);
@@ -317,6 +334,7 @@ archive_index_write (ArchiveIndex *archive_index, const char *path)
     goto end;
   }
 
+  // Write list of files
   archive_index->total_files = 0;
   archive_index->total_file_sizes = 0;
   for (list = archive_index->files; list; list = list->next) {
@@ -332,6 +350,7 @@ archive_index_write (ArchiveIndex *archive_index, const char *path)
     }
     ARCHIVE_FILE_FROM_BE (*archive_file);
   }
+  // Write file EOS
   memset (&file_eos, 0, sizeof(ArchiveFile));
   file_eos.eos.zero = 0;
   file_eos.eos.total_files = archive_index->total_files;
@@ -344,6 +363,7 @@ archive_index_write (ArchiveIndex *archive_index, const char *path)
   }
   ARCHIVE_FILE_EOS_FROM_BE (file_eos);
 
+  // Write list of directories
   archive_index->total_dirs = 0;
   for (list = archive_index->dirs; list; list = list->next) {
     ArchiveDirectory *archive_dir = list->data;
@@ -357,6 +377,7 @@ archive_index_write (ArchiveIndex *archive_index, const char *path)
     ARCHIVE_DIRECTORY_FROM_BE (*archive_dir);
   }
 
+  // Write EOS directory
   memset (&dir_eos, 0, sizeof(ArchiveDirectory));
   dir_eos.eos.zero = 0;
   dir_eos.eos.total_dirs = archive_index->total_dirs;
@@ -368,7 +389,8 @@ archive_index_write (ArchiveIndex *archive_index, const char *path)
   }
   ARCHIVE_DIRECTORY_EOS_FROM_BE (dir_eos);
 
-  if (archive_index->header.archive_type == 5) {
+  // Write footer for non-protected index
+  if (archive_index->header.archive_type == ARCHIVE_TYPE_NORMAL_CONTENT) {
     archive_index->footer.padding = 0;
 
     ARCHIVE_INDEX_FOOTER_TO_BE (archive_index->footer);
@@ -418,7 +440,7 @@ archive_data_read (ArchiveData *archive_data, const char *path)
   DatFileHeader dat_header;
   int read;
 
-  archive_data->header.id = archive_data->header.index = archive_data->header.archive_type = archive_data->header.id_type = 0;
+  archive_data->header.id = archive_data->header.index = archive_data->header.archive_type = archive_data->header.file_type = 0;
 
   if (!archive_open (path, &file, &dat_header)) {
     DBG ("Couldn't open file %s\n", path);
@@ -946,8 +968,8 @@ archive_add (const char *path, const char *game, int protected)
 
     archive_index.header.id = archive.header.id;
     archive_index.header.index = 0;
-    archive_index.header.archive_type = 4;
-    archive_index.header.id_type = 1;
+    archive_index.header.archive_type = ARCHIVE_TYPE_PROTECTED_CONTENT;
+    archive_index.header.file_type = FILE_TYPE_INDEX;
   } else {
     if (!archive_index_read (&archive_index, buffer))
       die ("Unable to read index archive\n");
@@ -1020,17 +1042,19 @@ archive_add (const char *path, const char *game, int protected)
     new_file = FALSE;
   } else {
     if (protected) {
-      dat_header.size =  0x30;
+      dat_header.encryption_type =  ENCRYPTION_TYPE_IDP;
       memset (dat_header.key_seed, 0, 0x14);
     } else {
-      dat_header.size = 0x40;
+      dat_header.encryption_type = ENCRYPTION_TYPE_KEYSEED;
       generate_random_key_seed (dat_header.key_seed);
     }
-    dat_header.type = 0x05;
+    dat_header.dat_type = DAT_TYPE_WITH_PROTECTED_ARCHIVE;
     memset (dat_header.padding, 0, 0x10);
 
     archive_header = archive_index.header;
     archive_header.index = index;
+    archive_header.archive_type = ARCHIVE_TYPE_NORMAL_CONTENT;
+    archive_header.file_type = FILE_TYPE_DATA;
 
     snprintf (buffer, sizeof(buffer), "%s/%s_%02d.dat", path, archive_index.prefix, index);
 
@@ -1139,8 +1163,8 @@ archive_create_backup (const char *path, const char *content, const char *protec
   archive.prefix = "archive";
   archive.header.id = archive_id;
   archive.header.index = 0;
-  archive.header.archive_type = 5;
-  archive.header.id_type = 1;
+  archive.header.archive_type = ARCHIVE_TYPE_NORMAL_CONTENT;
+  archive.header.file_type = FILE_TYPE_INDEX;
   memcpy (archive.footer.psid, open_psid, 0x10);
   archive.footer.archive2_size = 0;
 
@@ -1165,8 +1189,8 @@ archive_create_backup (const char *path, const char *content, const char *protec
     archive2.prefix = "archive2";
     archive2.header.id = archive_id;
     archive2.header.index = 0;
-    archive2.header.archive_type = 4;
-    archive2.header.id_type = 1;
+    archive2.header.archive_type = ARCHIVE_TYPE_PROTECTED_CONTENT;
+    archive2.header.file_type = FILE_TYPE_INDEX;
 
     snprintf (filename, sizeof(filename), "%s/%s.dat", path, archive2.prefix);
     if (!archive_index_write (&archive2, filename))
@@ -1192,9 +1216,7 @@ int
 archive_delete_protected (const char *path)
 {
   ArchiveIndex archive;
-  FILE *fd = NULL;
   char buffer[1024];
-  char archive_type = 3;
 
   archive.prefix = "archive";
   snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive.prefix);
@@ -1206,15 +1228,6 @@ archive_delete_protected (const char *path)
     die ("Unable to write index archive\n");
 
   archive_index_free (&archive);
-  fd = fopen (buffer, "rb+");
-  if (fd == NULL)
-    return FALSE;
-  fseek (fd, 7, SEEK_SET);
-  if (fwrite (&archive_type, 1, 1, fd) != 1) {
-    fclose (fd);
-    return FALSE;
-  }
-  fclose (fd);
 
   return TRUE;
 }

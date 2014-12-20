@@ -79,7 +79,7 @@ archive_print_dir (ArchiveDirectory *dir, char *prefix)
 static void
 archive_print_file (ArchiveFile *file, char *prefix)
 {
-  printf ("%s -%c%c%c%c%c%c%c%c%c %10llu %s\n", prefix,
+  printf ("%s -%c%c%c%c%c%c%c%c%c %10lu %s\n", prefix,
       file->stat.mode & 0400 ? 'r' : '-',
       file->stat.mode & 0200 ? 'w' : '-',
       file->stat.mode & 0100 ? 'x' : '-',
@@ -172,13 +172,13 @@ main (int argc, char *argv[])
           (ChainedListForeachCallback) archive_print_dir, (void *) "   |_ ");
       printf ("Backup id : ");
       print_hash ((u8 *) &archive_index.header.id, 8);
-      printf ("\nTotal files : %llu\n", archive_index.total_files);
-      printf ("Total directories : %llu\n", archive_index.total_dirs);
-      printf ("Total archive size : %llu bytes\n", archive_index.total_file_sizes);
+      printf ("\nTotal files : %lu\n", archive_index.total_files);
+      printf ("Total directories : %lu\n", archive_index.total_dirs);
+      printf ("Total archive size : %lu bytes\n", archive_index.total_file_sizes);
       if (archive_index.header.archive_type == 5) {
         printf ("Your Open PSID : ");
         print_hash (archive_index.footer.psid, 16);
-        printf ("\nTotal filesize of the copy-protected content : %llu bytes\n",
+        printf ("\nTotal filesize of the copy-protected content : %lu bytes\n",
             archive_index.footer.archive2_size);
       }
       archive_index_free (&archive_index);
@@ -195,7 +195,7 @@ main (int argc, char *argv[])
       printf ("Backup id : ");
       print_hash ((u8 *) &archive_data.header.id, 8);
       printf ("\nData archive index : %d\n", archive_data.header.index);
-      printf ("Backup id type : %d\n", archive_data.header.id_type);
+      printf ("Backup file type : %d\n", archive_data.header.file_type);
       printf ("Backup type : %d\n", archive_data.header.archive_type);
     } else if (strcasecmp (argv[i], "Decrypt") == 0) {
       /* Decrypt archive[_XX].dat decrypted.dat */

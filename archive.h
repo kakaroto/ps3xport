@@ -89,24 +89,24 @@ typedef struct {
 #define ARCHIVE_DIRECTORY_EOS_TO_BE(x) ARCHIVE_DIRECTORY_EOS_FROM_BE (x)
 
 typedef struct {
-  u32 size;
-  u32 type;
+  u32 encryption_type; // 0x30 for IDP or 0x40 for key seed
+  u32 dat_type; // 5 for a normal+copy-protected backup, 3 for a normal-only backup
   u8 hash[0x14];
   u8 key_seed[0x14];
   u8 padding[0x10];
 } __attribute__((packed)) DatFileHeader;
 
 #define ARCHIVE_DAT_FILE_HEADER_FROM_BE(x)                 \
-  (x).size = FROM_LE (32, (x).size);                       \
-  (x).type = FROM_BE (32, (x).type);
+  (x).encryption_type = FROM_LE (32, (x).encryption_type); \
+  (x).dat_type = FROM_BE (32, (x).dat_type);
 #define ARCHIVE_DAT_FILE_HEADER_TO_BE(x) ARCHIVE_DAT_FILE_HEADER_FROM_BE (x)
 
 
 typedef struct {
   u64 id;
   u32 index;
-  u8 archive_type; // 4 for copy protected, 5 for normal.
-  u8 id_type; // 1 means the archive_id is the current ticks ? 0 means system time ?
+  u8 archive_type; // 4 for copy protected, 5 for normal (and data?).
+  u8 file_type;  // could be 1 for index and 0 for data archives
   u16 padding;
 } __attribute__((packed)) ArchiveHeader;
 
@@ -138,6 +138,19 @@ typedef struct {
 typedef struct {
   ArchiveHeader header;
 } ArchiveData;
+
+#define ENCRYPTION_TYPE_IDP     0x30
+#define ENCRYPTION_TYPE_KEYSEED 0x40
+
+#define DAT_TYPE_NO_PROTECTED_ARCHIVE   0x03
+#define DAT_TYPE_WITH_PROTECTED_ARCHIVE 0x05
+
+#define ARCHIVE_TYPE_PROTECTED_CONTENT 0x04
+#define ARCHIVE_TYPE_NORMAL_CONTENT    0x05
+
+#define FILE_TYPE_DATA  0x00
+#define FILE_TYPE_INDEX 0x01
+
 
 
 ChainedList *chained_list_append (ChainedList *list, void *data);
