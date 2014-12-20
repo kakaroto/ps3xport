@@ -258,7 +258,7 @@ void aes128cbc_enc(u8 *key, u8 *iv, u8 *in, u64 len, u8 *out)
 
                   AES_encrypt(tmp, tmp_out, &k);
                   for (i = 0; i < len; i++)
-                    out[i] ^= tmp_out[i];
+                    out[i] = in[i] ^ tmp_out[i];
                   break;
                 } else {
                   for (i = 0; i < 16; i++)
