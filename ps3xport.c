@@ -65,31 +65,31 @@ static void
 archive_print_dir (ArchiveDirectory *dir, char *prefix)
 {
   printf ("%s d%c%c%c%c%c%c%c%c%c %s\n", prefix,
-      dir->stat.mode & 0400 ? 'r' : '-',
-      dir->stat.mode & 0200 ? 'w' : '-',
-      dir->stat.mode & 0100 ? 'x' : '-',
-      dir->stat.mode & 040 ? 'r' : '-',
-      dir->stat.mode & 020 ? 'w' : '-',
-      dir->stat.mode & 010 ? 'x' : '-',
-      dir->stat.mode & 04 ? 'r' : '-',
-      dir->stat.mode & 02 ? 'w' : '-',
-      dir->stat.mode & 01 ? 'x' : '-',
+      dir->fsstat.mode & 0400 ? 'r' : '-',
+      dir->fsstat.mode & 0200 ? 'w' : '-',
+      dir->fsstat.mode & 0100 ? 'x' : '-',
+      dir->fsstat.mode & 040 ? 'r' : '-',
+      dir->fsstat.mode & 020 ? 'w' : '-',
+      dir->fsstat.mode & 010 ? 'x' : '-',
+      dir->fsstat.mode & 04 ? 'r' : '-',
+      dir->fsstat.mode & 02 ? 'w' : '-',
+      dir->fsstat.mode & 01 ? 'x' : '-',
       dir->path);
 }
 static void
 archive_print_file (ArchiveFile *file, char *prefix)
 {
-  printf ("%s -%c%c%c%c%c%c%c%c%c %10lu %s\n", prefix,
-      file->stat.mode & 0400 ? 'r' : '-',
-      file->stat.mode & 0200 ? 'w' : '-',
-      file->stat.mode & 0100 ? 'x' : '-',
-      file->stat.mode & 040 ? 'r' : '-',
-      file->stat.mode & 020 ? 'w' : '-',
-      file->stat.mode & 010 ? 'x' : '-',
-      file->stat.mode & 04 ? 'r' : '-',
-      file->stat.mode & 02 ? 'w' : '-',
-      file->stat.mode & 01 ? 'x' : '-',
-      file->stat.file_size, file->path);
+  printf ("%s -%c%c%c%c%c%c%c%c%c %10" U64_FORMAT " %s\n", prefix,
+      file->fsstat.mode & 0400 ? 'r' : '-',
+      file->fsstat.mode & 0200 ? 'w' : '-',
+      file->fsstat.mode & 0100 ? 'x' : '-',
+      file->fsstat.mode & 040 ? 'r' : '-',
+      file->fsstat.mode & 020 ? 'w' : '-',
+      file->fsstat.mode & 010 ? 'x' : '-',
+      file->fsstat.mode & 04 ? 'r' : '-',
+      file->fsstat.mode & 02 ? 'w' : '-',
+      file->fsstat.mode & 01 ? 'x' : '-',
+      file->fsstat.file_size, file->path);
 }
 
 int
@@ -172,13 +172,13 @@ main (int argc, char *argv[])
           (ChainedListForeachCallback) archive_print_dir, (void *) "   |_ ");
       printf ("Backup id : ");
       print_hash ((u8 *) &archive_index.header.id, 8);
-      printf ("\nTotal files : %lu\n", archive_index.total_files);
-      printf ("Total directories : %lu\n", archive_index.total_dirs);
-      printf ("Total archive size : %lu bytes\n", archive_index.total_file_sizes);
+      printf ("\nTotal files : %" U64_FORMAT "\n", archive_index.total_files);
+      printf ("Total directories : %" U64_FORMAT "\n", archive_index.total_dirs);
+      printf ("Total archive size : %" U64_FORMAT " bytes\n", archive_index.total_file_sizes);
       if (archive_index.header.archive_type == 5) {
         printf ("Your Open PSID : ");
         print_hash (archive_index.footer.psid, 16);
-        printf ("\nTotal filesize of the copy-protected content : %lu bytes\n",
+        printf ("\nTotal filesize of the copy-protected content : %" U64_FORMAT " bytes\n",
             archive_index.footer.archive2_size);
       }
       archive_index_free (&archive_index);

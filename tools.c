@@ -471,7 +471,7 @@ int mkdir_recursive (const char *path)
     for (; i < len && temp[i] != '/'; i++);
     temp[i] = 0;
     if (!file_exists (temp)) {
-      ret = mkdir (temp, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+      ret = MKDIR (temp, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
       if (ret != 0)
         goto end;
     }

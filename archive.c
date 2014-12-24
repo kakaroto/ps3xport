@@ -131,7 +131,7 @@ archive_open (const char *path, PagedFile *file, DatFileHeader *dat_header)
 
   if (dat_header->dat_type != DAT_TYPE_WITH_PROTECTED_ARCHIVE &&
       dat_header->dat_type != DAT_TYPE_NO_PROTECTED_ARCHIVE) {
-    DBG ("Header type must be 5 or 3, not : %X\n", dat_header->type);
+    DBG ("Header type must be 5 or 3, not : %X\n", dat_header->dat_type);
     goto end;
   }
 
@@ -341,7 +341,7 @@ archive_index_write (ArchiveIndex *archive_index, const char *path)
     ArchiveFile *archive_file = list->data;
 
     archive_index->total_files++;
-    archive_index->total_file_sizes += archive_file->stat.file_size;
+    archive_index->total_file_sizes += archive_file->fsstat.file_size;
 
     ARCHIVE_FILE_TO_BE (*archive_file);
     if (paged_file_write (&file, archive_file, sizeof(ArchiveFile)) != sizeof(ArchiveFile)) {
@@ -493,14 +493,14 @@ archive_find_file (ArchiveIndex *archive_index, const char *path,
       return TRUE;
     }
     current = current->next;
-    if (*position + file->stat.file_size >= (u64) stat_buf.st_size) {
+    if (*position + file->fsstat.file_size >= (u64) stat_buf.st_size) {
       *position = 0x50;
       (*index)++;
       snprintf (data_path, sizeof(data_path), "%s/%s_%02d.dat", path, archive_index->prefix, *index);
       if (stat (data_path, &stat_buf) != 0)
         return FALSE;
     } else {
-      *position += file->stat.file_size;
+      *position += file->fsstat.file_size;
     }
   }
 
@@ -566,7 +566,7 @@ archive_extract_file (const char *path, const char *filename, const char *output
     die ("Unable to read index archive\n");
 
   if (archive_find_file (&archive, path, filename, &file, &index, &offset)) {
-    ret = archive_extract (&archive, path, index, offset, file->stat.file_size, output);
+    ret = archive_extract (&archive, path, index, offset, file->fsstat.file_size, output);
   } else if (device_id_set) {
     ArchiveIndex archive2;
 
@@ -577,7 +577,7 @@ archive_extract_file (const char *path, const char *filename, const char *output
       die ("Unable to read index archive\n");
 
     if (archive_find_file (&archive2, path, filename, &file, &index, &offset))
-      ret = archive_extract (&archive2, path, index, offset, file->stat.file_size, output);
+      ret = archive_extract (&archive2, path, index, offset, file->fsstat.file_size, output);
     archive_index_free (&archive2);
   }
 
@@ -765,7 +765,7 @@ archive_dump (const char *path, const char *prefix, const char *output)
   for (list = archive_index.files; list; list = list->next) {
     ArchiveFile *file = list->data;
     FILE *fd;
-    u64 len = file->stat.file_size;
+    u64 len = file->fsstat.file_size;
 
     snprintf (buffer, sizeof(buffer), "%s/%s", output, file->path);
     fd = fopen (buffer, "wb");
@@ -870,21 +870,21 @@ populate_dirlist (ChainedList **dirs, ChainedList **files,
 
       dev_flash2 = strncmp (archive_dir->path, "/dev_flash2", 11) == 0;
       if (strcmp (archive_dir->path, "/dev_hdd0/game") == 0)
-        archive_dir->stat.mode = 0x41ED;
+        archive_dir->fsstat.mode = 0x41ED;
       else if (strncmp (archive_dir->path, "/dev_hdd0/game/", 15) ==0)
-        archive_dir->stat.mode = 0x41FF;
+        archive_dir->fsstat.mode = 0x41FF;
       else if (dev_flash2)
-        archive_dir->stat.mode = 0x41C9;
+        archive_dir->fsstat.mode = 0x41C9;
       else
-        archive_dir->stat.mode = 0x41C0;
+        archive_dir->fsstat.mode = 0x41C0;
 
-      archive_dir->stat.uid = 0;
-      archive_dir->stat.gid = dev_flash2 ? 0 : -1;
-      archive_dir->stat.atime = stat_buf.st_atime;
-      archive_dir->stat.mtime = stat_buf.st_mtime;
-      archive_dir->stat.ctime = stat_buf.st_ctime;
-      archive_dir->stat.file_size = 0x200;
-      archive_dir->stat.block_size = 0x200;
+      archive_dir->fsstat.uid = 0;
+      archive_dir->fsstat.gid = dev_flash2 ? 0 : -1;
+      archive_dir->fsstat.atime = stat_buf.st_atime;
+      archive_dir->fsstat.mtime = stat_buf.st_mtime;
+      archive_dir->fsstat.ctime = stat_buf.st_ctime;
+      archive_dir->fsstat.file_size = 0x200;
+      archive_dir->fsstat.block_size = 0x200;
       archive_dir->flags = dev_flash2 ? 2 : (protected ? 0 : 1);
       *dirs = chained_list_append (*dirs, archive_dir);
 
@@ -903,17 +903,17 @@ populate_dirlist (ChainedList **dirs, ChainedList **files,
 
       dev_flash2 = strncmp (archive_file->path, "/dev_flash2", 11) == 0;
       if (strncmp (archive_file->path, "/dev_hdd0/game/", 15) ==0)
-        archive_file->stat.mode = 0x81B6;
+        archive_file->fsstat.mode = 0x81B6;
       else
-        archive_file->stat.mode = 0x8180;
+        archive_file->fsstat.mode = 0x8180;
 
-      archive_file->stat.uid = 0;
-      archive_file->stat.gid = dev_flash2 ? 0 : -1;
-      archive_file->stat.atime = stat_buf.st_atime;
-      archive_file->stat.mtime = stat_buf.st_mtime;
-      archive_file->stat.ctime = stat_buf.st_ctime;
-      archive_file->stat.file_size = stat_buf.st_size;
-      archive_file->stat.block_size = 0x200;
+      archive_file->fsstat.uid = 0;
+      archive_file->fsstat.gid = dev_flash2 ? 0 : -1;
+      archive_file->fsstat.atime = stat_buf.st_atime;
+      archive_file->fsstat.mtime = stat_buf.st_mtime;
+      archive_file->fsstat.ctime = stat_buf.st_ctime;
+      archive_file->fsstat.file_size = stat_buf.st_size;
+      archive_file->fsstat.block_size = 0x200;
       archive_file->flags = dev_flash2 ? 1 : 0;
       *files = chained_list_append (*files, archive_file);
     }

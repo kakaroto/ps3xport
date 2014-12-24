@@ -21,6 +21,7 @@ struct _ChainedList {
 };
 typedef void (*ChainedListForeachCallback) (void *, void *);
 
+#pragma pack(push, 1)
 typedef struct {
   u32 mode;
   u32 uid;
@@ -53,12 +54,12 @@ typedef struct {
       u64 total_file_sizes;
     } eos;
   };
-  FileStat stat;
+  FileStat fsstat;
   u32 flags; /* 1 == dev_flash2 */
 } __attribute__((packed)) ArchiveFile;
 
 #define ARCHIVE_FILE_FROM_BE(x)                 \
-  ARCHIVE_FILE_STAT_FROM_BE ((x).stat);         \
+  ARCHIVE_FILE_STAT_FROM_BE ((x).fsstat);         \
   (x).flags = FROM_BE (32, (x).flags);
 #define ARCHIVE_FILE_TO_BE(x) ARCHIVE_FILE_FROM_BE (x)
 
@@ -75,12 +76,12 @@ typedef struct {
       u64 total_dirs;
     } eos;
   };
-  FileStat stat;
+  FileStat fsstat;
   u32 flags; /* must be 1 for normal or 3 for dev_flash2 */
 } __attribute__((packed)) ArchiveDirectory;
 
 #define ARCHIVE_DIRECTORY_FROM_BE(x)                 \
-  ARCHIVE_FILE_STAT_FROM_BE ((x).stat);              \
+  ARCHIVE_FILE_STAT_FROM_BE ((x).fsstat);              \
   (x).flags = FROM_BE (32, (x).flags);
 #define ARCHIVE_DIRECTORY_TO_BE(x) ARCHIVE_DIRECTORY_FROM_BE (x)
 
@@ -123,6 +124,7 @@ typedef struct {
 #define ARCHIVE_INDEX_FOOTER_FROM_BE(x)                 \
   (x).archive2_size = FROM_BE (64, (x).archive2_size);
 #define ARCHIVE_INDEX_FOOTER_TO_BE(x) ARCHIVE_INDEX_FOOTER_FROM_BE (x)
+#pragma pack(pop)
 
 typedef struct {
   const char *prefix;

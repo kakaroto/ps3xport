@@ -11,11 +11,14 @@
 
 
 #include <stdio.h>
+#include <inttypes.h>
 
 #ifdef WIN32
 #define MKDIR(x,y) mkdir(x)
+#define U64_FORMAT PRIu64
 #else
 #define MKDIR(x,y) mkdir(x,y)
+#define U64_FORMAT "lu"
 #endif
 
 #define noop16(x) (x)
@@ -51,17 +54,12 @@
 #endif
 
 #undef DEBUG
+//#define DEBUG
 
 #ifdef DEBUG
 #define DBG(format, ...) fprintf (stderr, format, ## __VA_ARGS__)
 #else
 #define DBG(...)
 #endif
-
-#define ERROR(err, msg) do {                    \
-    perror (msg);                               \
-    exit (err);                                 \
-  } while(0);
-
 
 #endif /* __COMMON_H__ */
