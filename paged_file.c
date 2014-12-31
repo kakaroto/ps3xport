@@ -268,7 +268,7 @@ paged_file_seek (PagedFile *f, u64 offset)
         f->crypt == PAGED_FILE_CRYPT_AES_256_CBC) {
       if (offset >= 0x10) {
         fseek (f->fd, offset - 0x10, SEEK_SET);
-        if (fread (f->iv, 1, 0x10, f->fd) != 1)
+        if (fread (f->iv, 1, 0x10, f->fd) != 0x10)
           return -1;
       }
     } else if (f->crypt == PAGED_FILE_CRYPT_AES_128_CTR) {
