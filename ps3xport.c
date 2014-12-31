@@ -22,7 +22,7 @@
 #include <sys/types.h>
 #include <dirent.h>
 
-#define PS3XPORT_VERSION "0.1"
+#define PS3XPORT_VERSION "0.2"
 
 #define USAGE_STRING "PS3xport v" PS3XPORT_VERSION "\n"                 \
   "  Usage: %s command [argument ...] [command ...]\n"                  \
