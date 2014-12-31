@@ -246,7 +246,7 @@ paged_file_write (PagedFile *f, void *buffer, u32 len)
   return pos;
 }
 
-int
+u64
 paged_file_seek (PagedFile *f, u64 offset)
 {
   u32 pos;
@@ -295,17 +295,17 @@ paged_file_seek (PagedFile *f, u64 offset)
   return f->page_pos;
 }
 
-int
-paged_file_splice (PagedFile *f, PagedFile *from, int len)
+u64
+paged_file_splice (PagedFile *f, PagedFile *from, u64 len)
 {
   char buffer[1024];
-  int total = 0;
+  u64 total = 0;
   int size;
   int read;
 
-  while (len == -1 || total < len) {
+  while (len == (u64)-1 || total < len) {
     size = len - total;
-    if (len == -1 || (u32) size > sizeof(buffer))
+    if (len == (u64)-1 || (u32) size > sizeof(buffer))
       size = sizeof(buffer);
 
     read = paged_file_read (from, buffer, size);
