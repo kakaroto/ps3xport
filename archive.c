@@ -6,6 +6,9 @@
  *
  */
 
+#define  __USE_FILE_OFFSET64
+#define __USE_LARGEFILE64
+
 #include "tools.h"
 #include "types.h"
 #include "common.h"
@@ -20,6 +23,11 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <dirent.h>
+
+#ifdef _WIN32
+#undef stat
+#define stat _stat64
+#endif
 
 static u8 device_id[0x10] = {0};
 static int device_id_set = FALSE;
