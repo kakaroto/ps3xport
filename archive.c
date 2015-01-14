@@ -975,15 +975,10 @@ archive_add (const char *path, const char *game, int protected)
     if (!file_exists (buffer)) {
         if (!protected)
             die ("Invalid backup directory, call CreateBackup if you need to create one\n");
-
         archive_index.header.id = archive.header.id;
         archive_index.header.index = 0;
-        //TODO FIX ALL CONDITIONS FOR TYPE OF CONTENT.
-        //if(protected){
-        //archive_header.archive_type = ARCHIVE_TYPE_PROTECTED_CONTENT;
-        //}else{
         archive_header.archive_type = ARCHIVE_TYPE_NORMAL_CONTENT;
-        //}
+        //archive_header.archive_type = ARCHIVE_TYPE_PROTECTED_CONTENT; // MUST BE NORMAL CONTENT OR IT'll FAIL
         archive_index.header.file_type = FILE_TYPE_INDEX;
     } else {
         if (!archive_index_read (&archive_index, buffer))
@@ -1002,57 +997,50 @@ archive_add (const char *path, const char *game, int protected)
         archive_index.dirs = chained_list_append (archive_index.dirs, dir);
     }
     chained_list_free (dirs);
-
     while (1) {
         snprintf (buffer, sizeof(buffer), "%s/%s_%02d.dat", path, archive_index.prefix, index);
         if (!file_exists (buffer)) {
-            if (index == 0)
+             if(index==0)
                 break;
-            if (!new_file)
-                index--;
+            index--;
             break;
         }
         index++;
     }
 
     snprintf (buffer, sizeof(buffer), "%s/%s_%02d.dat", path, archive_index.prefix, index);
+    int firstindex=index;
     if (file_exists (buffer)) {
         if (!archive_open (buffer, &in, &dat_header))
             die ("Couldn't open archive %d\n", index);
-
         if (paged_file_read (&in, &archive_header, sizeof(archive_header)) != sizeof(archive_header))
             die ("Couldn't read header\n");
         ARCHIVE_HEADER_FROM_BE (archive_header);
-
         if (archive_header.id != archive_index.header.id)
             die ("Wrong archive ID\n");
         if (archive_header.index != index)
             die ("Wrong archive index\n");
         snprintf (buffer, sizeof(buffer), "%s/%s_%02d.tmp", path, archive_index.prefix, index);
-
         if (!paged_file_open (&out, buffer, FALSE))
             die ("Couldn't open output archive %d\n", index);
-
         ARCHIVE_DAT_FILE_HEADER_TO_BE (dat_header);
         if (paged_file_write (&out, &dat_header, sizeof(dat_header)) != sizeof(dat_header))
             die ("Couldn't write file dat header\n");
         ARCHIVE_DAT_FILE_HEADER_FROM_BE (dat_header);
-
         total_file_size += sizeof(dat_header);
-
         if (!archive_gen_keys (&dat_header, key, iv, hmac))
             die ("Error generating keys\n");
-
         paged_file_flush (&out);
         paged_file_hash (&out, hmac);
         paged_file_crypt (&out, key, iv, PAGED_FILE_CRYPT_AES_128_CBC, NULL, NULL);
-
+        ARCHIVE_HEADER_TO_BE (archive_header); //HAD TO ADD THIS BECAUSE IT WOULDN'T SET A GOOD ARCHIVE INDEX.
         if (paged_file_write (&out, &archive_header, sizeof(archive_header)) != sizeof(archive_header))
             die ("Couldn't write encrypted header\n");
+        ARCHIVE_HEADER_FROM_BE (archive_header);//HAD TO ADD THIS BECAUSE IT WOULDN'T SET A GOOD ARCHIVE INDEX.
         total_file_size += sizeof(archive_header);
-        total_file_size += paged_file_splice (&out, &in, -1);
-        //        if (total_file_size > 0xFFFFFE00) //TODO NEED TO BE FIXED PRIORITY FOR LARGER BACKUPS priority
-        //            die ("Output file is too big\n");
+        total_file_size += paged_file_splice (&out, &in,-1);
+        //if (total_file_size > 0x20000000 //Not needed? Guess i'm removing this...
+        //    die ("Output file is too big\n");
         paged_file_close (&in);
         new_file = FALSE;
     } else {
@@ -1068,44 +1056,36 @@ archive_add (const char *path, const char *game, int protected)
 
         archive_header = archive_index.header;
         archive_header.index = index;
-        //TODO FIX ALL CONDITIONS FOR TYPE OF CONTENT.
-        //if(protected){
-        //archive_header.archive_type = ARCHIVE_TYPE_PROTECTED_CONTENT;
-        //}else{
-        archive_header.archive_type = ARCHIVE_TYPE_NORMAL_CONTENT;
-        //}
+        //TODO FIX ALL CONDITIONS FOR TYPE OF CONTENT. ARCHIVE TYPE MUST BE THE SAME FOR ALL ARCHIVES
+//        if(protected){
+//            archive_header.archive_type = ARCHIVE_TYPE_PROTECTED_CONTENT;
+//        }else{
+            archive_header.archive_type = ARCHIVE_TYPE_NORMAL_CONTENT; // MUST BE NORMAL OR IT MIGHT FAIL
+//        }
         archive_header.file_type = FILE_TYPE_DATA;
-
         snprintf (buffer, sizeof(buffer), "%s/%s_%02d.dat", path, archive_index.prefix, index);
-
         if (!paged_file_open (&out, buffer, FALSE))
             die ("Couldn't open output archive %d\n", index);
-
         ARCHIVE_DAT_FILE_HEADER_TO_BE (dat_header);
         if (paged_file_write (&out, &dat_header, sizeof(dat_header)) != sizeof(dat_header))
             die ("Couldn't write file dat header\n");
         ARCHIVE_DAT_FILE_HEADER_FROM_BE (dat_header);
-
         total_file_size += sizeof(dat_header);
-
         if (!archive_gen_keys (&dat_header, key, iv, hmac))
             die ("Error generating keys\n");
-
         paged_file_flush (&out);
         paged_file_hash (&out, hmac);
         paged_file_crypt (&out, key, iv, PAGED_FILE_CRYPT_AES_128_CBC, NULL, NULL);
-
         ARCHIVE_HEADER_TO_BE (archive_header);
         if (paged_file_write (&out, &archive_header, sizeof(archive_header)) != sizeof(archive_header))
             die ("Couldn't write encrypted header\n");
         ARCHIVE_HEADER_TO_BE (archive_header);
-
         total_file_size += sizeof(archive_header);
         new_file = TRUE;
     }
     int locked=0;
-    //u32 filelimit = 0x989680; //PRUEBA
-    u32 filelimit = 0xEFFFFFFF; //CHOSEN
+    //u32 filelimit = 0x10000000; //PRUEBA
+    u32 filelimit = 0xEFFFFFFF;
     for (list = files; list; list = list->next) {
         ArchiveFile *file = list->data;
 
@@ -1123,7 +1103,6 @@ archive_add (const char *path, const char *game, int protected)
             if (read == 0){
                 break;
             }
-            /* TODO : Must be able to exceed a file size of 0xFFFFFE00 by splitting */
             if(!locked){
                 paged_file_write (&out, buffer, read);
                 total_file_size += read;
@@ -1132,9 +1111,7 @@ archive_add (const char *path, const char *game, int protected)
                 total_file_size += read;
             }
             if(total_file_size +read > filelimit){
-                printf("File Limit reached! Creating a New File\n");
-                locked=1;
-                if (index>0){
+                if (locked){
                     paged_file_flush(&out1);
                     fp=out1.fd;
                     out1.fd=NULL;
@@ -1143,9 +1120,11 @@ archive_add (const char *path, const char *game, int protected)
                     fwrite(out1.digest,0x14,1,fp);
                     fclose(fp);
                 }
+                locked=1;
                 ++index;
-                snprintf (buffer, sizeof(buffer), "%s/%s_%02d.dat", path, archive_index.prefix, index);
+                printf("File Limit reached! Creating File %s/%s_%02d.dat\n", path, archive_index.prefix, index);
                 total_file_size=0;
+                snprintf (buffer, sizeof(buffer), "%s/%s_%02d.dat", path, archive_index.prefix, index);
                 if (protected) {
                     dat_header.encryption_type =  ENCRYPTION_TYPE_IDP;
                     memset (dat_header.key_seed, 0, 0x14);
@@ -1159,12 +1138,13 @@ archive_add (const char *path, const char *game, int protected)
                 archive_header = archive_index.header;
                 archive_header.id = archive_index.header.id;
                 archive_header.index = index;
-                //TODO FIX ALL CONDITIONS FOR TYPE OF CONTENT.
-                //if(protected){
-                //archive_header.archive_type = ARCHIVE_TYPE_PROTECTED_CONTENT;
-                //}else{
-                archive_header.archive_type = ARCHIVE_TYPE_NORMAL_CONTENT;
-                //}
+
+                //TODO FIX ALL CONDITIONS FOR TYPE OF CONTENT. ARCHIVE TYPE MUST BE THE SAME FOR ALL ARCHIVES
+//                if(protected){
+//                    archive_header.archive_type = ARCHIVE_TYPE_PROTECTED_CONTENT;
+//                }else{
+                    archive_header.archive_type = ARCHIVE_TYPE_NORMAL_CONTENT;
+//                }
                 archive_header.file_type = FILE_TYPE_DATA;
                 if (!paged_file_open (&out1, buffer, FALSE))
                     die ("Couldn't open output archive %d\n", index);
@@ -1189,7 +1169,6 @@ archive_add (const char *path, const char *game, int protected)
         fclose (fd);
         archive_index.files = chained_list_append (archive_index.files, file);
     }
-    index=0;
     if (locked){
         paged_file_flush(&out1);
         fp=out1.fd;
@@ -1199,136 +1178,138 @@ archive_add (const char *path, const char *game, int protected)
         fwrite(out1.digest,0x14,1,fp);
         fclose(fp);
     }
-        paged_file_flush (&out);
-        fd = out.fd;
-        out.fd = NULL;
-        paged_file_close (&out);
+    index=firstindex;
 
-        fseek (fd, 8, SEEK_SET);
-        fwrite (out.digest, 0x14, 1, fd);
-        fclose (fd);
+    paged_file_flush (&out);
+    fd = out.fd;
+    out.fd = NULL;
+    paged_file_close (&out);
 
-        if (!new_file) {
-            snprintf (buffer, 0x500, "%s/%s_%02d.bak", path, archive_index.prefix, index);
-            snprintf (buffer + 0x500, 0x500, "%s/%s_%02d.dat", path, archive_index.prefix, index);
-            if (rename (buffer + 0x500, buffer) != 0)
-                die ("File rename failed\n");
-            snprintf (buffer, 0x500, "%s/%s_%02d.tmp", path, archive_index.prefix, index);
-            if (rename (buffer, buffer + 0x500) != 0)
-                die ("File rename failed\n");
-        }
-        snprintf (buffer, 0x500, "%s/%s.dat", path, archive_index.prefix);
-        snprintf (buffer + 0x500, 0x500, "%s/%s.bak", path, archive_index.prefix);
+    fseek (fd, 8, SEEK_SET);
+    fwrite (out.digest, 0x14, 1, fd);
+    fclose (fd);
+
+    if (!new_file) {
+        snprintf (buffer, 0x500, "%s/%s_%02d.bak", path, archive_index.prefix, index);
+        snprintf (buffer + 0x500, 0x500, "%s/%s_%02d.dat", path, archive_index.prefix, index);
+        if (rename (buffer + 0x500, buffer) != 0)
+            die ("File rename failed\n");
+        snprintf (buffer, 0x500, "%s/%s_%02d.tmp", path, archive_index.prefix, index);
         if (rename (buffer, buffer + 0x500) != 0)
             die ("File rename failed\n");
-        if (!archive_index_write (&archive_index, buffer))
-            die ("Unable to write index archive\n");
+    }
+    snprintf (buffer, 0x500, "%s/%s.dat", path, archive_index.prefix);
+    snprintf (buffer + 0x500, 0x500, "%s/%s.bak", path, archive_index.prefix);
+    if (rename (buffer, buffer + 0x500) != 0)
+        die ("File rename failed\n");
+    if (!archive_index_write (&archive_index, buffer))
+        die ("Unable to write index archive\n");
 
-        if (protected) {
-            archive.footer.archive2_size = archive_index.total_file_sizes;
-            snprintf (buffer, 0x500, "%s/%s.dat", path, archive.prefix);
-            archive_index_write (&archive, buffer);
-        }
-
-        archive_index_free (&archive);
-        archive_index_free (&archive_index);
-
-        return TRUE;
+    if (protected) {
+        archive.footer.archive2_size = archive_index.total_file_sizes;
+        snprintf (buffer, 0x500, "%s/%s.dat", path, archive.prefix);
+        archive_index_write (&archive, buffer);
     }
 
-    int
-            archive_create_backup (const char *path, const char *content, const char *protected_content)
-    {
-        ArchiveIndex archive = {0};
-        ArchiveIndex archive2 = {0};
-        char filename[1024];
-        u64 archive_id;
+    archive_index_free (&archive);
+    archive_index_free (&archive_index);
 
-        mkdir_recursive (path);
-        get_rand ((u8 *)&archive_id, 8);
+    return TRUE;
+}
 
-        archive.prefix = "archive";
-        archive.header.id = archive_id;
-        archive.header.index = 0;
-        archive.header.archive_type = ARCHIVE_TYPE_NORMAL_CONTENT;
-        archive.header.file_type = FILE_TYPE_INDEX;
-        memcpy (archive.footer.psid, open_psid, 0x10);
-        archive.footer.archive2_size = 0;
+int
+archive_create_backup (const char *path, const char *content, const char *protected_content)
+{
+    ArchiveIndex archive = {0};
+    ArchiveIndex archive2 = {0};
+    char filename[1024];
+    u64 archive_id;
 
-        snprintf (filename, sizeof(filename), "%s/%s.dat", path, archive.prefix);
-        if (!archive_index_write (&archive, filename))
-            die ("Unable to write index archive\n");
+    mkdir_recursive (path);
+    get_rand ((u8 *)&archive_id, 8);
 
-        if (content &&
-                content[0] != 0 &&
-                (content[0] != '-' || content[1] != 0) ) {
+    archive.prefix = "archive";
+    archive.header.id = archive_id;
+    archive.header.index = 0;
+    archive.header.archive_type = ARCHIVE_TYPE_NORMAL_CONTENT;
+    archive.header.file_type = FILE_TYPE_INDEX;
+    memcpy (archive.footer.psid, open_psid, 0x10);
+    archive.footer.archive2_size = 0;
 
-            if (archive_add (path, content, FALSE) == FALSE)
-                return FALSE;
-            snprintf (filename, sizeof(filename), "%s/%s.bak", path, archive.prefix);
-            remove (filename);
-        }
+    snprintf (filename, sizeof(filename), "%s/%s.dat", path, archive.prefix);
+    if (!archive_index_write (&archive, filename))
+        die ("Unable to write index archive\n");
 
+    if (content &&
+            content[0] != 0 &&
+            (content[0] != '-' || content[1] != 0) ) {
 
-        if (protected_content &&
-                protected_content[0] != 0 &&
-                (protected_content[0] != '-' || protected_content[1] != 0)) {
-            archive2.prefix = "archive2";
-            archive2.header.id = archive_id;
-            archive2.header.index = 0;
-            archive2.header.archive_type = ARCHIVE_TYPE_PROTECTED_CONTENT;
-            archive2.header.file_type = FILE_TYPE_INDEX;
-
-            snprintf (filename, sizeof(filename), "%s/%s.dat", path, archive2.prefix);
-            if (!archive_index_write (&archive2, filename))
-                die ("Unable to write index archive\n");
-
-            if (archive_add (path, protected_content, TRUE) == FALSE)
-                return FALSE;
-
-            if (!archive_index_read (&archive2, filename))
-                die ("Unable to read index archive\n");
-
-            snprintf (filename, sizeof(filename), "%s/%s.bak", path, archive2.prefix);
-            remove (filename);
-        }
-
-        archive_index_free (&archive);
-        archive_index_free (&archive2);
-
-        return TRUE;
+        if (archive_add (path, content, FALSE) == FALSE)
+            return FALSE;
+        snprintf (filename, sizeof(filename), "%s/%s.bak", path, archive.prefix);
+        remove (filename);
     }
 
-    int
-            archive_delete_protected (const char *path)
-    {
-        ArchiveIndex archive;
-        char buffer[1024];
 
-        archive.prefix = "archive";
-        snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive.prefix);
-        if (!archive_index_read (&archive, buffer))
+    if (protected_content &&
+            protected_content[0] != 0 &&
+            (protected_content[0] != '-' || protected_content[1] != 0)) {
+        archive2.prefix = "archive2";
+        archive2.header.id = archive_id;
+        archive2.header.index = 0;
+        archive2.header.archive_type = ARCHIVE_TYPE_PROTECTED_CONTENT;
+        archive2.header.file_type = FILE_TYPE_INDEX;
+
+        snprintf (filename, sizeof(filename), "%s/%s.dat", path, archive2.prefix);
+        if (!archive_index_write (&archive2, filename))
+            die ("Unable to write index archive\n");
+
+        if (archive_add (path, protected_content, TRUE) == FALSE)
+            return FALSE;
+
+        if (!archive_index_read (&archive2, filename))
             die ("Unable to read index archive\n");
 
-        archive.footer.archive2_size = 0;
-        if (!archive_index_write (&archive, buffer))
-            die ("Unable to write index archive\n");
-
-        archive_index_free (&archive);
-
-        return TRUE;
+        snprintf (filename, sizeof(filename), "%s/%s.bak", path, archive2.prefix);
+        remove (filename);
     }
 
-    void
-            archive_set_device_id (const u8 idps[0x10])
-    {
-        memcpy (device_id, idps, 0x10);
-        device_id_set = TRUE;
-    }
+    archive_index_free (&archive);
+    archive_index_free (&archive2);
 
-    void
-            archive_set_open_psid (const u8 psid[0x10])
-    {
-        memcpy (open_psid, psid, 0x10);
-        open_psid_set = TRUE;
-    }
+    return TRUE;
+}
+
+int
+archive_delete_protected (const char *path)
+{
+    ArchiveIndex archive;
+    char buffer[1024];
+
+    archive.prefix = "archive";
+    snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive.prefix);
+    if (!archive_index_read (&archive, buffer))
+        die ("Unable to read index archive\n");
+
+    archive.footer.archive2_size = 0;
+    if (!archive_index_write (&archive, buffer))
+        die ("Unable to write index archive\n");
+
+    archive_index_free (&archive);
+
+    return TRUE;
+}
+
+void
+archive_set_device_id (const u8 idps[0x10])
+{
+    memcpy (device_id, idps, 0x10);
+    device_id_set = TRUE;
+}
+
+void
+archive_set_open_psid (const u8 psid[0x10])
+{
+    memcpy (open_psid, psid, 0x10);
+    open_psid_set = TRUE;
+}
