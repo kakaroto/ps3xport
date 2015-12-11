@@ -24,7 +24,7 @@
 
 typedef struct {
   struct SHA1Context sha1;
-  u8 tmp[0x40 + 0x14]; // opad + hash(ipad + message)
+  u8 tmp[0x40 + 0x14]; // opad + hash (ipad + message)
 } HMACContext;
 
 void HMACReset(HMACContext *ctx, u8 *key);

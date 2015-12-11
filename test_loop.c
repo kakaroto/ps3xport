@@ -1,3 +1,8 @@
+// Copyright (C) 2015 Kakaroto
+
+// This software is distributed under the terms of the GNU General Public
+// License ("GPL") version 3, as published by the Free Software Foundation.
+
 #include <ppu-lv2.h>
 #include <stdio.h>
 #include <string.h>
@@ -57,12 +62,14 @@ int main () {
   {
     memset(data, 0, 64);
     memset(iv, 0, 16);
+	
 /*
     printf ("IN DATA:\n");
     hex_dump(data, 64);
     printf ("IN IV:\n");
     hex_dump(iv, 16);
 */
+
     ret = encrypt_with_portability (i, iv, data);
     printf ("ret = %X\n", ret);
     printf ("encrypt_with_portability type %d\n", i);
@@ -77,12 +84,14 @@ int main () {
   {
     memset(data, 0, 64);
     memset(iv, 0, 16);
+	
 /*
     printf ("IN DATA:\n");
     hex_dump(data, 64);
     printf ("IN IV:\n");
     hex_dump(iv, 16);
 */
+
     ret = encrypt (i, iv, data);
     printf ("ret = %X\n", ret);
     printf ("encrypt type %d\n", i);
@@ -113,7 +122,9 @@ static void hex_dump(void *data, int size)
     char charstr[16*1 + 5] = {0};
     for(n=1;n<=size;n++) {
         if (n%16 == 1) {
-            /* store address for this line */
+			
+            // store address for this line
+			
             snprintf(addrstr, sizeof(addrstr), "%.4x",
                ((unsigned int)p-(unsigned int)data) );
         }
@@ -123,30 +134,37 @@ static void hex_dump(void *data, int size)
             c = '.';
         }
 
-        /* store hex str (for left side) */
+        // store hex str (for left side)
+		
         snprintf(bytestr, sizeof(bytestr), "0x%02X, ", *p);
         strncat(hexstr, bytestr, sizeof(hexstr)-strlen(hexstr)-1);
 
-        /* store char str (for right side) */
+        // store char str (for right side)
+		
         snprintf(bytestr, sizeof(bytestr), "%c", c);
         strncat(charstr, bytestr, sizeof(charstr)-strlen(charstr)-1);
 
         if(n%16 == 0) { 
-            /* line completed */
+		
+            // line completed
+			
             printf("%-90.90s\n", hexstr );
             hexstr[0] = 0;
             charstr[0] = 0;
         } else if(n%8 == 0) {
-            /* half line: add whitespaces */
+			
+            // half line: add white spaces
+			
             strncat(hexstr, "  ", sizeof(hexstr)-strlen(hexstr)-1);
             strncat(charstr, " ", sizeof(charstr)-strlen(charstr)-1);
         }
-        p++; /* next byte */
+        p++; // next byte
     }
 
     if (strlen(hexstr) > 0) {
-        /* print rest of buffer if not empty */
+		
+        // print rest of buffer if not empty
+		
         printf("%-90.90s\n", hexstr );
     }
 }
-

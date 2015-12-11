@@ -1,6 +1,5 @@
 # Makefile.am for ps3xport
-#
-# Licensed under LGPL 2.1. See file COPYING.
+# Licensed under GPL v3. See file COPYING.
 
 ERROR_CFLAGS = \
 	$(PS3XPORT_CFLAGS) \

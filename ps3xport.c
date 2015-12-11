@@ -1,10 +1,7 @@
-/*
- * Copyright (C) The Freedom League
- *
- * This software is distributed under the terms of the GNU General Public
- * License ("GPL") version 3, as published by the Free Software Foundation.
- *
- */
+// Copyright (C) 2015 Kakaroto
+
+// This software is distributed under the terms of the GNU General Public
+// License ("GPL") version 3, as published by the Free Software Foundation.
 
 #include "tools.h"
 #include "types.h"
@@ -102,14 +99,18 @@ main (int argc, char *argv[])
 
   for (i = 1; i < argc; i++) {
     if (strcasecmp (argv[i], "SetKeysFile") == 0) {
-      /* SetKeysFile filename */
+		
+      // SetKeysFile filename
+	  
       if (i + 1 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
       keys_set_path (argv[++i]);
     } else if (strcasecmp (argv[i], "SetDeviceID") == 0 ||
         strcasecmp (argv[i], "SetPSID") == 0) {
-      /* SetDeviceID (HEX|filename) */
-      /* SetPSID (HEX|filename) */
+			
+      // SetDeviceID (HEX|filename)
+      // SetPSID (HEX|filename)
+	  
       u8 id[0x10];
 
       if (i + 1 >= argc)
@@ -135,7 +136,9 @@ main (int argc, char *argv[])
         archive_set_open_psid (id);
       i++;
     }  else if (strcasecmp (argv[i], "ExtractPSID") == 0) {
-      /* ExtractPSID backup_dir output */
+		
+      // ExtractPSID backup_dir output
+	  
       ArchiveIndex archive;
       char path[1024];
       FILE *f = NULL;
@@ -154,7 +157,9 @@ main (int argc, char *argv[])
 
       i += 2;
     } else if (strcasecmp (argv[i], "ReadIndex") == 0) {
-      /* ReadIndex archive.dat */
+		
+      // ReadIndex archive.dat
+	  
       ArchiveIndex archive_index;
 
       if (i + 1 >= argc)
@@ -183,7 +188,9 @@ main (int argc, char *argv[])
       }
       archive_index_free (&archive_index);
     } else if (strcasecmp (argv[i], "ReadData") == 0) {
-      /* ReadData archive_XX.dat */
+		
+      // ReadData archive_XX.dat
+	  
       ArchiveData archive_data;
 
       if (i + 1 >= argc)
@@ -198,7 +205,9 @@ main (int argc, char *argv[])
       printf ("Backup file type : %d\n", archive_data.header.file_type);
       printf ("Backup type : %d\n", archive_data.header.archive_type);
     } else if (strcasecmp (argv[i], "Decrypt") == 0) {
-      /* Decrypt archive[_XX].dat decrypted.dat */
+		
+      // Decrypt archive[_XX].dat decrypted.dat
+	  
       if (i + 2 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
 
@@ -207,7 +216,9 @@ main (int argc, char *argv[])
 
       i += 2;
     } else if (strcasecmp (argv[i], "Dump") == 0) {
-      /* Dump backup_dir destination_dir */
+		
+      // Dump backup_dir destination_dir
+	  
       if (i + 2 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
 
@@ -216,7 +227,9 @@ main (int argc, char *argv[])
 
       i += 2;
     } else if (strcasecmp (argv[i], "ExtractFile") == 0) {
-      /* ExtractFile backup_dir filename destination */
+		
+      // ExtractFile backup_dir filename destination
+	  
       if (i + 3 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
 
@@ -225,7 +238,9 @@ main (int argc, char *argv[])
 
       i += 3;
     } else if (strcasecmp (argv[i], "ExtractPath") == 0) {
-      /* ExtractPath backup_dir path destination_dir */
+		
+      // ExtractPath backup_dir path destination_dir
+	  
       if (i + 3 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
 
@@ -234,7 +249,9 @@ main (int argc, char *argv[])
 
       i += 3;
     } else if (strcasecmp (argv[i], "DeleteFile") == 0) {
-      /* DeleteFile backup_dir filename */
+		
+      // DeleteFile backup_dir filename
+	  
       if (i + 2 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
 
@@ -242,7 +259,9 @@ main (int argc, char *argv[])
 
       i += 2;
     } else if (strcasecmp (argv[i], "DeletePath") == 0) {
-      /* DeletePath backup_dir path */
+		
+      // DeletePath backup_dir path
+	  
       if (i + 2 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
 
@@ -250,7 +269,9 @@ main (int argc, char *argv[])
 
       i += 2;
     } else if (strcasecmp (argv[i], "DeleteProtected") == 0) {
-      /* DeleteProtected backup_dir */
+		
+      // DeleteProtected backup_dir
+	  
       if (i + 1 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
 
@@ -258,7 +279,9 @@ main (int argc, char *argv[])
 
       i++;
     } else if (strcasecmp (argv[i], "Add") == 0) {
-      /* Add backup_dir directory */
+		
+      // Add backup_dir directory
+	  
       if (i + 2 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
 
@@ -267,18 +290,22 @@ main (int argc, char *argv[])
 
       i += 2;
     } else if (strcasecmp (argv[i], "AddProtected") == 0) {
-      /* AddProtected backup_dir directory */
+		
+      // AddProtected backup_dir directory
 
       if (i + 2 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
 
-      /* Add the dir to the backup */
+      // Add the dir to the backup
+	  
       if (!archive_add (argv[i+1], argv[i+2], TRUE))
         die ("Error adding directory to backup!\n");
 
       i += 2;
     } else if (strcasecmp (argv[i], "CreateBackup") == 0) {
-      /* ExtractFile backup_dir filename destination */
+		
+      // ExtractFile backup_dir filename destination
+	  
       if (i + 3 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
 
@@ -297,4 +324,3 @@ main (int argc, char *argv[])
   keys_free (keys, num_keys);
   return 0;
 }
-

@@ -1,10 +1,7 @@
-/*
- * Copyright (C) The Freedom League
- *
- * This software is distributed under the terms of the GNU General Public
- * License ("GPL") version 3, as published by the Free Software Foundation.
- *
- */
+// Copyright (C) 2015 Kakaroto
+
+// This software is distributed under the terms of the GNU General Public
+// License ("GPL") version 3, as published by the Free Software Foundation.
 
 #include "tools.h"
 #include "types.h"
@@ -143,7 +140,6 @@ paged_file_hash (PagedFile *f, u8 *key)
   return TRUE;
 }
 
-
 static int
 paged_file_read_new_page (PagedFile *f)
 {
@@ -214,7 +210,6 @@ paged_file_flush (PagedFile *f)
   return written;
 }
 
-
 int
 paged_file_write (PagedFile *f, void *buffer, u32 len)
 {
@@ -263,7 +258,9 @@ paged_file_seek (PagedFile *f, u64 offset)
   }
 
   if (f->crypt != PAGED_FILE_CRYPT_NONE) {
-    /* TODO: support other crypto */
+	
+    // TODO: support other crypto
+	
     if (f->crypt == PAGED_FILE_CRYPT_AES_128_CBC ||
         f->crypt == PAGED_FILE_CRYPT_AES_256_CBC) {
       if (offset >= 0x10) {

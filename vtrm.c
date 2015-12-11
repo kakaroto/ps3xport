@@ -1,10 +1,7 @@
-/*
- * Copyright (C) The Freedom League
- *
- * This software is distributed under the terms of the GNU General Public
- * License ("GPL") version 3, as published by the Free Software Foundation.
- *
- */
+// Copyright (C) 2015 Kakaroto
+
+// This software is distributed under the terms of the GNU General Public
+// License ("GPL") version 3, as published by the Free Software Foundation.
 
 #include <stdlib.h>
 #include <string.h>
@@ -200,7 +197,6 @@ sc_decrypt (u32 type, u8 *laid_paid, u8 *iv, u8 *in, u32 in_size, u8 *out)
     key[i] ^= laid_paid[i];
   aes128cbc (key, iv, in, in_size, out);
 }
-
 
 /*
 void tst ()

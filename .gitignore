@@ -1,5 +1,153 @@
-*.o
+# Linux stuff
+
+# Only for Linux, not sure what it is for though...
 *~
+
+# Linux package management formats
+
+*.dmg
+*.xpi
+*.gem
+*.egg
+*.deb
+*.rpm
+
+# KDE directory preferences
+.directory
+
+# Linux trash folder
+.Trash-*
+
+# Windows stuff
+
+# Windows image thumbnail cache
+[Tt]humbs.db
+ehthumbs.db
+
+# Windows folder config file
+[Dd]esktop.ini
+
+# Recycle bin used on file shares
+$R[Ee][Cc][Yy][Cc][Ll][Ee].B[Ii][Nn]/
+R[Ee][Cc][Yy][Cc][Ll][Ee][Rr]/
+
+# Windows installer files
+*.cab
+*.msi
+*.msm
+*.msp
+
+# Windows shortcuts and recent items links
+*.lnk
+
+# System restore data/restore points, Windows backup, volume shadow copy, content indexer, CHKDSK logs
+System Volume Information/
+
+# System Recovery boot image
+[Rr][Ee][Cc][Oo][Vv][Ee][Rr][Yy]/
+
+# Virtual Memory file
+[Pp]agefile.sys
+
+# Hibernation data
+[Hh]iberfil.sys
+
+# System boot files
+boot/
+
+# Cached MSI install files
+[Cc][Oo][Nn][Ff][Ii][Gg].[Mm][Ss][Ii]
+MSOCache/
+
+# System performance logs
+[Pp]erf[Ll]ogs/
+
+# Mac stuff
+
+._*
+__MACOSX/
+.DS_Store
+.AppleDouble
+.LSOverride
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.AppleDB
+.AppleDesktop
+.apdisk
+Network Trash Folder
+Temporary Items
+
+# SVN
+
+.svn/
+
+# Mercurial/HG
+
+.hg/
+*/.hg/
+*/.hgignore
+.hgignore
+.hgsigs
+.hgsub
+.hgsubstate
+.hgtags
+
+# CVS
+
+/CVS/*
+*/CVS/*
+**/CVS/*
+.cvsignore
+*/.cvsignore
+
+# TortoiseGit config file
+
+/.tgitconfig
+
+# Temporary and backup files
+
+*.tmp
+*.bak
+
+# Microsoft Office temporary files
+
+~$*.doc*
+~$*.xls*
+*.xlk
+~$*.ppt*
+
+# LibreOffice locks
+.~lock.*#
+
+# Compressed and packed data
+
+*.7z
+*.rar
+*.zip
+*.tar
+*.gz
+*.bzip
+*.bz2
+*.xz
+*.lzma
+*.iso
+*.img
+*.ccd
+*.nrg
+
+# Compiled binaries
+
+*.jar
+*.exe
+*.com
+*.cmd
+
+# stuff for this project
+*.o
 tst_sc_encrypt
 ps3xport
 .deps/
@@ -18,4 +166,3 @@ install-sh
 ltmain.sh
 missing
 stamp-h1
-
