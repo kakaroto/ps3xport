@@ -902,13 +902,13 @@ populate_dirlist (ChainedList **dirs, ChainedList **files,
 
       dev_flash2 = strncmp (archive_dir->path, "/dev_flash2", 11) == 0;
       if (strcmp (archive_dir->path, "/dev_hdd0/game") == 0)
-        archive_dir->fsstat.mode = 0x41ED;
+        archive_dir->fsstat.mode = 0x41FF;
       else if (strncmp (archive_dir->path, "/dev_hdd0/game/", 15) ==0)
         archive_dir->fsstat.mode = 0x41FF;
       else if (dev_flash2)
         archive_dir->fsstat.mode = 0x41C9;
       else
-        archive_dir->fsstat.mode = 0x41C0;
+        archive_dir->fsstat.mode = 0x41FF;
 
       archive_dir->fsstat.uid = 0;
       archive_dir->fsstat.gid = dev_flash2 ? 0 : -1;
@@ -936,8 +936,10 @@ populate_dirlist (ChainedList **dirs, ChainedList **files,
       dev_flash2 = strncmp (archive_file->path, "/dev_flash2", 11) == 0;
       if (strncmp (archive_file->path, "/dev_hdd0/game/", 15) ==0)
         archive_file->fsstat.mode = 0x81B6;
-      else
+      else if (dev_flash2)
         archive_file->fsstat.mode = 0x8180;
+      else
+        archive_file->fsstat.mode = 0x81B6;
 
       archive_file->fsstat.uid = 0;
       archive_file->fsstat.gid = dev_flash2 ? 0 : -1;
