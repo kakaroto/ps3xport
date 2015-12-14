@@ -1,10 +1,7 @@
-/*
- * Copyright (C) The Freedom League
- *
- * This software is distributed under the terms of the GNU General Public
- * License ("GPL") version 3, as published by the Free Software Foundation.
- *
- */
+// Copyright (C) 2015 Kakaroto
+
+// This software is distributed under the terms of the GNU General Public
+// License ("GPL") version 3, as published by the Free Software Foundation.
 
 #ifndef __ARCHIVE_H__
 #define __ARCHIVE_H__
@@ -55,7 +52,7 @@ typedef struct {
     } eos;
   };
   FileStat fsstat;
-  u32 flags; /* 1 == dev_flash2 */
+  u32 flags; // 1 == dev_flash2
 } __attribute__((packed)) ArchiveFile;
 
 #define ARCHIVE_FILE_FROM_BE(x)                 \
@@ -77,7 +74,7 @@ typedef struct {
     } eos;
   };
   FileStat fsstat;
-  u32 flags; /* must be 1 for normal or 3 for dev_flash2 */
+  u32 flags; // must be 1 for normal or 3 for dev_flash2
 } __attribute__((packed)) ArchiveDirectory;
 
 #define ARCHIVE_DIRECTORY_FROM_BE(x)                 \
@@ -106,7 +103,7 @@ typedef struct {
 typedef struct {
   u64 id;
   u32 index;
-  u8 archive_type; // 4 for copy protected, 5 for normal (and data?).
+  u8 archive_type; // 4 for copy protected, 5 for normal (and data?)
   u8 file_type;  // could be 1 for index and 0 for data archives
   u16 padding;
 } __attribute__((packed)) ArchiveHeader;
@@ -152,8 +149,6 @@ typedef struct {
 
 #define FILE_TYPE_DATA  0x00
 #define FILE_TYPE_INDEX 0x01
-
-
 
 ChainedList *chained_list_append (ChainedList *list, void *data);
 void chained_list_foreach (ChainedList *list, ChainedListForeachCallback cb, void *user_data);

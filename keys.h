@@ -1,10 +1,7 @@
-/*
- * Copyright (C) The Freedom League
- *
- * This software is distributed under the terms of the GNU General Public
- * License ("GPL") version 3, as published by the Free Software Foundation.
- *
- */
+// Copyright (C) 2015 Kakaroto
+
+// This software is distributed under the terms of the GNU General Public
+// License ("GPL") version 3, as published by the Free Software Foundation.
 
 #ifndef __KEYS_H__
 #define __KEYS_H__ 1
@@ -20,7 +17,6 @@
 #define KEY_TYPE_APP "app"
 #define KEY_TYPE_NPDRM "npdrm"
 #define KEY_TYPE_SC "sc"
-
 
 typedef struct {
   char *name;

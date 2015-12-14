@@ -26,16 +26,13 @@
 #include "sha1.h"
 #include "common.h"
 
-//
 // misc
-//
 
 void print_hash(u8 *ptr, u32 len)
 {
 	while(len--)
 		printf(" %02x", *ptr++);
 }
-
 
 void memcpy_to_file(const char *fname, u8 *ptr, u64 size)
 {
@@ -58,7 +55,6 @@ static void fail(const char *a, ...)
 
 	exit(1);
 }
-
 
 #ifdef WIN32
 void get_rand(u8 *bfr, u32 size)
@@ -89,10 +85,8 @@ void get_rand(u8 *bfr, u32 size)
 }
 #endif
 
-
-//
 // crypto
-//
+
 void aes256cbc(u8 *key, u8 *iv_in, u8 *in, u64 len, u8 *out)
 {
 	AES_KEY k;
@@ -119,7 +113,6 @@ void aes256cbc(u8 *key, u8 *iv_in, u8 *in, u64 len, u8 *out)
 
 	}
 }
-
 
 void aes256cbc_enc(u8 *key, u8 *iv, u8 *in, u64 len, u8 *out)
 {
@@ -242,6 +235,7 @@ void aes128cbc(u8 *key, u8 *iv_in, u8 *in, u64 len, u8 *out)
 
 	}
 }
+
 void aes128cbc_enc(u8 *key, u8 *iv, u8 *in, u64 len, u8 *out)
 {
 	AES_KEY k;
@@ -289,6 +283,7 @@ void aes128ctr(u8 *key, u8 *iv, u8 *in, u64 len, u8 *out)
 			AES_encrypt(iv, ctr, &k);
 
 			// increase nonce
+			
 			tmp = be64(iv + 8) + 1;
 			wbe64(iv + 8, tmp);
 			if (tmp == 0)
@@ -312,9 +307,8 @@ void aes128_enc(u8 *key, const u8 *in, u8 *out) {
     AES_encrypt(in, out, &k);
 }
 
-
-
 // FIXME: use a non-broken sha1.c *sigh*
+
 static void sha1_fixup(struct SHA1Context *ctx, u8 *digest)
 {
 	u32 i;
@@ -338,13 +332,12 @@ void sha1(u8 *data, u32 len, u8 *digest)
 	sha1_fixup(&ctx, digest);
 }
 
-
 void sha1_hmac(u8 *key, u8 *data, u32 len, u8 *digest)
 {
 	struct SHA1Context ctx;
 	u32 i;
 	u8 ipad[0x40];
-	u8 tmp[0x40 + 0x14]; // opad + hash(ipad + message)
+	u8 tmp[0x40 + 0x14]; // opad + hash (ipad + message)
 
 	SHA1Reset(&ctx);
 
@@ -362,7 +355,6 @@ void sha1_hmac(u8 *key, u8 *data, u32 len, u8 *digest)
 	sha1(tmp, sizeof tmp, digest);
 
 }
-
 
 void HMACReset(HMACContext *ctx, u8 *key)
 {
@@ -410,7 +402,9 @@ void hex_dump(void *data, int size)
     char charstr[16*1 + 5] = {0};
     for(n=1;n<=size;n++) {
         if (n%16 == 1) {
-            /* store address for this line */
+			
+            // store address for this line
+			
             snprintf(addrstr, sizeof(addrstr), "%.4x",
                ((unsigned int)p-(unsigned int)data) );
         }
@@ -420,29 +414,37 @@ void hex_dump(void *data, int size)
             c = '.';
         }
 
-        /* store hex str (for left side) */
+        // store hex str (for left side)
+		
         snprintf(bytestr, sizeof(bytestr), "%02X ", *p);
         strncat(hexstr, bytestr, sizeof(hexstr)-strlen(hexstr)-1);
 
-        /* store char str (for right side) */
+        // store char str (for right side)
+		
         snprintf(bytestr, sizeof(bytestr), "%c", c);
         strncat(charstr, bytestr, sizeof(charstr)-strlen(charstr)-1);
 
         if(n%16 == 0) {
-            /* line completed */
+			
+            // line completed
+			
             printf("[%4.4s]   %-50.50s  %s\n", addrstr, hexstr, charstr);
             hexstr[0] = 0;
             charstr[0] = 0;
         } else if(n%8 == 0) {
-            /* half line: add whitespaces */
+			
+            // half line: add whitespaces
+			
             strncat(hexstr, "  ", sizeof(hexstr)-strlen(hexstr)-1);
             strncat(charstr, " ", sizeof(charstr)-strlen(charstr)-1);
         }
-        p++; /* next byte */
+        p++; // next byte
     }
 
     if (strlen(hexstr) > 0) {
-        /* print rest of buffer if not empty */
+		
+        // print rest of buffer if not empty
+		
         printf("[%4.4s]   %-50.50s  %s\n", addrstr, hexstr, charstr);
     }
 }

@@ -1,10 +1,7 @@
-/*
- * Copyright (C) The Freedom League
- *
- * This software is distributed under the terms of the GNU General Public
- * License ("GPL") version 3, as published by the Free Software Foundation.
- *
- */
+// Copyright (C) 2015 Kakaroto
+
+// This software is distributed under the terms of the GNU General Public
+// License ("GPL") version 3, as published by the Free Software Foundation.
 
 #define  __USE_FILE_OFFSET64
 #define __USE_LARGEFILE64
@@ -82,10 +79,9 @@ generate_random_key_seed (u8 *seed)
   get_rand (seed, 0x14);
 }
 
-/**
- * The archive is encrypted and we need to generate the keys by either
- * using the device id (IDP) or the key seed in the archive header
- */
+// The archive is encrypted and we need to generate the keys by either
+// using the device ID (IDP) or the key seed in the archive header
+
 static int
 archive_gen_keys (DatFileHeader *header, u8 *key, u8 *iv, u8 *hmac)
 {
@@ -131,6 +127,7 @@ archive_open (const char *path, PagedFile *file, DatFileHeader *dat_header)
   ARCHIVE_DAT_FILE_HEADER_FROM_BE (*dat_header);
 
   // encryption type is either 0x40 (includes a key seed) or 0x30 (uses IDP as key seed)
+  
   if (dat_header->encryption_type != ENCRYPTION_TYPE_KEYSEED &&
       dat_header->encryption_type != ENCRYPTION_TYPE_IDP) {
     DBG ("Invalid dat encryption type : %X\n", dat_header->encryption_type);
@@ -178,17 +175,18 @@ archive_decrypt (const char *path, const char *to)
   }
 
   // Write the header that was read by archive_open()
+  
   ARCHIVE_DAT_FILE_HEADER_TO_BE (dat_header);
   fwrite (&dat_header, sizeof(dat_header), 1, fd);
   ARCHIVE_DAT_FILE_HEADER_FROM_BE (dat_header);
 
   // Then decrypt (automatically with paged_file_read) and write to file
+  
   do {
     u8 buffer[1024];
     read = paged_file_read (&file, buffer, sizeof(buffer));
     fwrite (buffer, read, 1, fd);
   } while (read > 0);
-
 
   ret = TRUE;
  end:
@@ -220,6 +218,7 @@ archive_index_read (ArchiveIndex *archive_index, const char *path)
   }
 
   // Read the archive header
+  
   if (paged_file_read (&file, &archive_index->header, sizeof(archive_index->header)) != sizeof(archive_index->header)) {
     DBG ("Couldn't read archive encrypted header\n");
     goto end;
@@ -227,13 +226,16 @@ archive_index_read (ArchiveIndex *archive_index, const char *path)
   ARCHIVE_HEADER_FROM_BE (archive_index->header);
 
   // Read all the file list until the EOS file block
+  
   while(1) {
     ArchiveFile *archive_file = malloc (sizeof(ArchiveFile));
     if (paged_file_read (&file, archive_file, sizeof(ArchiveFile)) != sizeof(ArchiveFile)) {
       DBG ("Couldn't read file entry\n");
       goto end;
     }
+	
     // Found the last file
+	
     if (archive_file->eos.zero == 0) {
       ARCHIVE_FILE_EOS_FROM_BE (*archive_file);
       archive_index->total_files = archive_file->eos.total_files;
@@ -245,14 +247,18 @@ archive_index_read (ArchiveIndex *archive_index, const char *path)
     archive_index->files = chained_list_append (archive_index->files, archive_file);
     DBG ("File : %s\n", archive_file->path);
   }
+  
   // Read all the directory list until EOS directory block
+  
   while(1) {
     ArchiveDirectory *archive_dir = malloc (sizeof(ArchiveDirectory));
     if (paged_file_read (&file, archive_dir, sizeof(ArchiveDirectory)) != sizeof(ArchiveDirectory)) {
       DBG ("Couldn't read directory entry\n");
       goto end;
     }
+	
     // Found last directory
+	
     if (archive_dir->eos.zero == 0) {
       ARCHIVE_DIRECTORY_EOS_FROM_BE (*archive_dir);
       archive_index->total_dirs = archive_dir->eos.total_dirs;
@@ -265,6 +271,7 @@ archive_index_read (ArchiveIndex *archive_index, const char *path)
   }
 
   // Read the footer for the non-protected archive index only
+  
   if (archive_index->header.archive_type == ARCHIVE_TYPE_NORMAL_CONTENT) {
     if (paged_file_read (&file, &archive_index->footer, sizeof(archive_index->footer)) != sizeof(archive_index->footer)) {
       DBG ("Couldn't read index archive footer\n");
@@ -286,7 +293,6 @@ archive_index_read (ArchiveIndex *archive_index, const char *path)
   paged_file_close (&file);
   return FALSE;
 }
-
 
 int
 archive_index_write (ArchiveIndex *archive_index, const char *path)
@@ -311,7 +317,9 @@ archive_index_write (ArchiveIndex *archive_index, const char *path)
     dat_header.encryption_type =  ENCRYPTION_TYPE_IDP;
     memset (dat_header.key_seed, 0, 0x14);
   } else {
+	  
     // If there is no copy-protected content, set type to 3 to avoid a warning
+	
     if (archive_index->footer.archive2_size == 0)
       dat_header.dat_type = DAT_TYPE_NO_PROTECTED_ARCHIVE;
 
@@ -332,7 +340,8 @@ archive_index_write (ArchiveIndex *archive_index, const char *path)
     goto end;
   }
 
-  // Flush the dat header before we enable hmac hashing and encryption
+  // Flush the dat header before we enable HMAC hashing and encryption
+  
   paged_file_flush (&file);
   paged_file_hash (&file, hmac);
   paged_file_crypt (&file, key, iv, PAGED_FILE_CRYPT_AES_128_CBC, NULL, NULL);
@@ -343,6 +352,7 @@ archive_index_write (ArchiveIndex *archive_index, const char *path)
   }
 
   // Write list of files
+  
   archive_index->total_files = 0;
   archive_index->total_file_sizes = 0;
   for (list = archive_index->files; list; list = list->next) {
@@ -358,7 +368,9 @@ archive_index_write (ArchiveIndex *archive_index, const char *path)
     }
     ARCHIVE_FILE_FROM_BE (*archive_file);
   }
+  
   // Write file EOS
+  
   memset (&file_eos, 0, sizeof(ArchiveFile));
   file_eos.eos.zero = 0;
   file_eos.eos.total_files = archive_index->total_files;
@@ -372,6 +384,7 @@ archive_index_write (ArchiveIndex *archive_index, const char *path)
   ARCHIVE_FILE_EOS_FROM_BE (file_eos);
 
   // Write list of directories
+  
   archive_index->total_dirs = 0;
   for (list = archive_index->dirs; list; list = list->next) {
     ArchiveDirectory *archive_dir = list->data;
@@ -386,6 +399,7 @@ archive_index_write (ArchiveIndex *archive_index, const char *path)
   }
 
   // Write EOS directory
+  
   memset (&dir_eos, 0, sizeof(ArchiveDirectory));
   dir_eos.eos.zero = 0;
   dir_eos.eos.total_dirs = archive_index->total_dirs;
@@ -398,6 +412,7 @@ archive_index_write (ArchiveIndex *archive_index, const char *path)
   ARCHIVE_DIRECTORY_EOS_FROM_BE (dir_eos);
 
   // Write footer for non-protected index
+  
   if (archive_index->header.archive_type == ARCHIVE_TYPE_NORMAL_CONTENT) {
     archive_index->footer.padding = 0;
 
@@ -417,7 +432,6 @@ archive_index_write (ArchiveIndex *archive_index, const char *path)
   fseek (fd, 8, SEEK_SET);
   fwrite (file.digest, 0x14, 1, fd);
   fclose (fd);
-
 
   return TRUE;
 
@@ -567,7 +581,8 @@ archive_extract_file (const char *path, const char *filename, const char *output
   u64 offset;
   int ret = FALSE;
 
-  /* Try to extract from archive.dat */
+  // Try to extract from archive.dat
+  
   archive.prefix = "archive";
   snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive.prefix);
   if (!archive_index_read (&archive, buffer))
@@ -579,7 +594,9 @@ archive_extract_file (const char *path, const char *filename, const char *output
     ArchiveIndex archive2;
 
     archive2.prefix = "archive2";
-    /* Extract from archive2.dat */
+	
+    // Extract from archive2.dat
+	
     snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive2.prefix);
     if (!archive_index_read (&archive2, buffer))
       die ("Unable to read index archive\n");
@@ -610,7 +627,8 @@ archive_extract_path (const char *path, const char *match, const char *output)
   char buffer[2048];
   int match_len = strlen (match);
 
-  /* Try to extract from archive.dat */
+  // Try to extract from archive.dat
+  
   archive.prefix = "archive";
   snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive.prefix);
   if (!archive_index_read (&archive, buffer))
@@ -619,7 +637,8 @@ archive_extract_path (const char *path, const char *match, const char *output)
   chained_list_foreach (archive.files,
       (ChainedListForeachCallback) archive_append_file_to_list_cb, &all_files);
 
-  /* Try to extract from archive2.dat */
+  // Try to extract from archive2.dat
+  
   if (device_id_set) {
     archive2.prefix = "archive2";
     snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive2.prefix);
@@ -665,7 +684,8 @@ archive_rename_file (const char *path, const char *filename, const char *destina
   u32 index;
   u64 offset;
 
-  /* Try to extract from archive.dat */
+  // Try to extract from archive.dat
+  
   archive.prefix = "archive";
   snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive.prefix);
   if (!archive_index_read (&archive, buffer))
@@ -682,7 +702,9 @@ archive_rename_file (const char *path, const char *filename, const char *destina
     ArchiveIndex archive2;
 
     archive2.prefix = "archive2";
-    /* Extract from archive2.dat */
+	
+    // Extract from archive2.dat
+	
     snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive2.prefix);
     if (!archive_index_read (&archive2, buffer))
       die ("Unable to read index archive\n");
@@ -708,7 +730,8 @@ archive_rename_path (const char *path, const char *match, const char *destinatio
   char buffer[2048];
   int match_len = strlen (match);
 
-  /* Try to extract from archive.dat */
+  // Try to extract from archive.dat
+  
   archive.prefix = "archive";
   snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive.prefix);
   if (!archive_index_read (&archive, buffer))
@@ -717,7 +740,8 @@ archive_rename_path (const char *path, const char *match, const char *destinatio
   chained_list_foreach (archive.files,
       (ChainedListForeachCallback) archive_append_file_to_list_cb, &all_files);
 
-  /* Try to extract from archive2.dat */
+  // Try to extract from archive2.dat
+  
   if (device_id_set) {
     archive2.prefix = "archive2";
     snprintf (buffer, sizeof(buffer), "%s/%s.dat", path, archive2.prefix);
@@ -1110,7 +1134,9 @@ archive_add (const char *path, const char *game, int protected)
       int read = fread (buffer, 1, sizeof(buffer), fd);
       if (read == 0)
         break;
-      /* TODO : Must be able to exceed a file size of 0xFFFFFE00 by splitting */
+	
+      // TODO: Must be able to exceed a file size of 0xFFFFFE00 by splitting
+	  
       if (total_file_size + read > 0xFFFFFE00)
         die ("Output file is too big\n");
       paged_file_write (&out, buffer, read);
