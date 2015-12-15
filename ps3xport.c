@@ -1,7 +1,11 @@
-// Copyright (C) 2015 Kakaroto
+/*
 
-// This software is distributed under the terms of the GNU General Public
-// License ("GPL") version 3, as published by the Free Software Foundation.
+Copyright 2015 Kakaroto
+
+This software is distributed under the terms of the GNU General Public
+License ("GPL") version 3, as published by the Free Software Foundation.
+
+*/
 
 #include "tools.h"
 #include "types.h"
@@ -100,7 +104,7 @@ main (int argc, char *argv[])
   for (i = 1; i < argc; i++) {
     if (strcasecmp (argv[i], "SetKeysFile") == 0) {
 		
-      // SetKeysFile filename
+      /* SetKeysFile filename */
 	  
       if (i + 1 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
@@ -108,8 +112,12 @@ main (int argc, char *argv[])
     } else if (strcasecmp (argv[i], "SetDeviceID") == 0 ||
         strcasecmp (argv[i], "SetPSID") == 0) {
 			
-      // SetDeviceID (HEX|filename)
-      // SetPSID (HEX|filename)
+      /*
+	  
+	  SetDeviceID (HEX|filename)
+      SetPSID (HEX|filename)
+	  
+	  */
 	  
       u8 id[0x10];
 
@@ -137,7 +145,7 @@ main (int argc, char *argv[])
       i++;
     }  else if (strcasecmp (argv[i], "ExtractPSID") == 0) {
 		
-      // ExtractPSID backup_dir output
+      /* ExtractPSID backup_dir output */
 	  
       ArchiveIndex archive;
       char path[1024];
@@ -158,7 +166,7 @@ main (int argc, char *argv[])
       i += 2;
     } else if (strcasecmp (argv[i], "ReadIndex") == 0) {
 		
-      // ReadIndex archive.dat
+      /* ReadIndex archive.dat */
 	  
       ArchiveIndex archive_index;
 
@@ -175,7 +183,7 @@ main (int argc, char *argv[])
       printf ("   |\n");
       chained_list_foreach (archive_index.dirs,
           (ChainedListForeachCallback) archive_print_dir, (void *) "   |_ ");
-      printf ("Backup id : ");
+      printf ("Backup ID : ");
       print_hash ((u8 *) &archive_index.header.id, 8);
       printf ("\nTotal files : %" U64_FORMAT "\n", archive_index.total_files);
       printf ("Total directories : %" U64_FORMAT "\n", archive_index.total_dirs);
@@ -183,13 +191,13 @@ main (int argc, char *argv[])
       if (archive_index.header.archive_type == 5) {
         printf ("Your Open PSID : ");
         print_hash (archive_index.footer.psid, 16);
-        printf ("\nTotal filesize of the copy-protected content : %" U64_FORMAT " bytes\n",
+        printf ("\nTotal file size of the copy-protected content : %" U64_FORMAT " bytes\n",
             archive_index.footer.archive2_size);
       }
       archive_index_free (&archive_index);
     } else if (strcasecmp (argv[i], "ReadData") == 0) {
 		
-      // ReadData archive_XX.dat
+      /* ReadData archive_XX.dat */
 	  
       ArchiveData archive_data;
 
@@ -199,14 +207,14 @@ main (int argc, char *argv[])
 
       if (!archive_data_read (&archive_data, argv[i]))
         die ("Error parsing archive data!\n");
-      printf ("Backup id : ");
+      printf ("Backup ID : ");
       print_hash ((u8 *) &archive_data.header.id, 8);
       printf ("\nData archive index : %d\n", archive_data.header.index);
       printf ("Backup file type : %d\n", archive_data.header.file_type);
       printf ("Backup type : %d\n", archive_data.header.archive_type);
     } else if (strcasecmp (argv[i], "Decrypt") == 0) {
 		
-      // Decrypt archive[_XX].dat decrypted.dat
+      /* Decrypt archive[_XX].dat decrypted.dat */
 	  
       if (i + 2 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
@@ -217,7 +225,7 @@ main (int argc, char *argv[])
       i += 2;
     } else if (strcasecmp (argv[i], "Dump") == 0) {
 		
-      // Dump backup_dir destination_dir
+      /* Dump backup_dir destination_dir */
 	  
       if (i + 2 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
@@ -228,7 +236,7 @@ main (int argc, char *argv[])
       i += 2;
     } else if (strcasecmp (argv[i], "ExtractFile") == 0) {
 		
-      // ExtractFile backup_dir filename destination
+      /* ExtractFile backup_dir filename destination */
 	  
       if (i + 3 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
@@ -239,7 +247,7 @@ main (int argc, char *argv[])
       i += 3;
     } else if (strcasecmp (argv[i], "ExtractPath") == 0) {
 		
-      // ExtractPath backup_dir path destination_dir
+      /* ExtractPath backup_dir path destination_dir */
 	  
       if (i + 3 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
@@ -250,7 +258,7 @@ main (int argc, char *argv[])
       i += 3;
     } else if (strcasecmp (argv[i], "DeleteFile") == 0) {
 		
-      // DeleteFile backup_dir filename
+      /* DeleteFile backup_dir filename */
 	  
       if (i + 2 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
@@ -260,7 +268,7 @@ main (int argc, char *argv[])
       i += 2;
     } else if (strcasecmp (argv[i], "DeletePath") == 0) {
 		
-      // DeletePath backup_dir path
+      /* DeletePath backup_dir path */
 	  
       if (i + 2 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
@@ -270,7 +278,7 @@ main (int argc, char *argv[])
       i += 2;
     } else if (strcasecmp (argv[i], "DeleteProtected") == 0) {
 		
-      // DeleteProtected backup_dir
+      /* DeleteProtected backup_dir */
 	  
       if (i + 1 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
@@ -280,7 +288,7 @@ main (int argc, char *argv[])
       i++;
     } else if (strcasecmp (argv[i], "Add") == 0) {
 		
-      // Add backup_dir directory
+      /* Add backup_dir directory */
 	  
       if (i + 2 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
@@ -291,12 +299,12 @@ main (int argc, char *argv[])
       i += 2;
     } else if (strcasecmp (argv[i], "AddProtected") == 0) {
 		
-      // AddProtected backup_dir directory
+      /* AddProtected backup_dir directory */
 
       if (i + 2 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
 
-      // Add the dir to the backup
+      /* Add the directory to the backup */
 	  
       if (!archive_add (argv[i+1], argv[i+2], TRUE))
         die ("Error adding directory to backup!\n");
@@ -304,13 +312,13 @@ main (int argc, char *argv[])
       i += 2;
     } else if (strcasecmp (argv[i], "CreateBackup") == 0) {
 		
-      // ExtractFile backup_dir filename destination
+      /* ExtractFile backup_dir filename destination */
 	  
       if (i + 3 >= argc)
         die (USAGE_STRING "Not enough arguments to command\n", argv[0]);
 
       if (file_exists (argv[i+1]))
-          die ("Backup dir must not exist in order to create a new one\n");
+          die ("Backup directory must not already exist in order to create a new one\n");
 
       if (!archive_create_backup (argv[i+1], argv[i+2], argv[i+3]))
         die ("Unable to create backup\n");

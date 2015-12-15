@@ -1,7 +1,15 @@
-// Copyright 2010            Sven Peter <svenpeter@gmail.com>
-// Copyright 2007,2008,2010  Segher Boessenkool  <segher@kernel.crashing.org>
-// Licensed under the terms of the GNU GPL, version 2
-// http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
+/*
+
+Copyright 2010
+Sven Peter <svenpeter@gmail.com>
+
+Copyright 2007, 2008, 2010
+Segher Boessenkool <segher@kernel.crashing.org>
+
+Licensed under the terms of the GNU GPL, version 2
+http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
+
+*/
 
 #ifndef TOOLS_H__
 #define TOOLS_H__ 1
@@ -24,7 +32,7 @@
 
 typedef struct {
   struct SHA1Context sha1;
-  u8 tmp[0x40 + 0x14]; // opad + hash (ipad + message)
+  u8 tmp[0x40 + 0x14]; // OPAD + hash (IPAD + message)
 } HMACContext;
 
 void HMACReset(HMACContext *ctx, u8 *key);

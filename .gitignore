@@ -1,6 +1,6 @@
 # Linux stuff
 
-# Only for Linux, not sure what it is for though...
+# Emacs history files
 *~
 
 # Linux package management formats
@@ -146,7 +146,8 @@ Temporary Items
 *.com
 *.cmd
 
-# stuff for this project
+# PS3xport-specific stuff
+
 *.o
 tst_sc_encrypt
 ps3xport

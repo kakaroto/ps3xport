@@ -1,6 +1,12 @@
-// Copyright 2010       Sven Peter <svenpeter@gmail.com>
-// Licensed under the terms of the GNU GPL, version 2
-// http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
+/*
+
+Copyright 2010
+Sven Peter <svenpeter@gmail.com>
+
+Licensed under the terms of the GNU GPL, version 2
+http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
+
+*/
 
 #ifndef TYPES_H__
 #define TYPES_H__
@@ -95,19 +101,19 @@ struct keylist {
 };
 
 struct rif {
-    u8 unk1[0x10]; // version, license type and user number
-    u8 titleid[0x30]; // content ID
-    u8 padding[0xC]; // padding for randomness
-    u32 actDatIndex; // key index on act.dat between 0x00 and 0x7F
-    u8 key[0x10]; // encrypted klicensee
-    u64 unk2; // timestamp?
-    u64 unk3; // always 0
+    u8 unk1[0x10]; /* Version, license type and user number */
+    u8 titleid[0x30]; /* Content ID */
+    u8 padding[0xC]; /* Padding for randomness */
+    u32 actDatIndex; /* Key index on act.dat between 0x00 and 0x7F */
+    u8 key[0x10]; /* Encrypted klicensee */
+    u64 unk2; /* Timestamp? */
+    u64 unk3; /* Always 0 */
     u8 rs[0x28];
 } __attribute__ ((packed));
 
 struct actdat {
-    u8 unk1[0x10]; // version, user number
-    u8 keyTable[0x800]; // key table
+    u8 unk1[0x10]; /* Version, user number */
+    u8 keyTable[0x800]; /* Key table */
     u8 unk2[0x800];
     u8 signature[0x28];
 } __attribute__ ((packed));

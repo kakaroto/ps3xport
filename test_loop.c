@@ -1,7 +1,11 @@
-// Copyright (C) 2015 Kakaroto
+/*
 
-// This software is distributed under the terms of the GNU General Public
-// License ("GPL") version 3, as published by the Free Software Foundation.
+Copyright 2015 Kakaroto
+
+This software is distributed under the terms of the GNU General Public
+License ("GPL") version 3, as published by the Free Software Foundation.
+
+*/
 
 #include <ppu-lv2.h>
 #include <stdio.h>
@@ -123,7 +127,7 @@ static void hex_dump(void *data, int size)
     for(n=1;n<=size;n++) {
         if (n%16 == 1) {
 			
-            // store address for this line
+            /* Store address for this line */
 			
             snprintf(addrstr, sizeof(addrstr), "%.4x",
                ((unsigned int)p-(unsigned int)data) );
@@ -134,36 +138,36 @@ static void hex_dump(void *data, int size)
             c = '.';
         }
 
-        // store hex str (for left side)
+        /* Store hex str (for left side) */
 		
         snprintf(bytestr, sizeof(bytestr), "0x%02X, ", *p);
         strncat(hexstr, bytestr, sizeof(hexstr)-strlen(hexstr)-1);
 
-        // store char str (for right side)
+        /* Store char str (for right side) */
 		
         snprintf(bytestr, sizeof(bytestr), "%c", c);
         strncat(charstr, bytestr, sizeof(charstr)-strlen(charstr)-1);
 
         if(n%16 == 0) { 
 		
-            // line completed
+            /* Line completed */
 			
             printf("%-90.90s\n", hexstr );
             hexstr[0] = 0;
             charstr[0] = 0;
         } else if(n%8 == 0) {
 			
-            // half line: add white spaces
+            /* Half line: add white spaces */
 			
             strncat(hexstr, "  ", sizeof(hexstr)-strlen(hexstr)-1);
             strncat(charstr, " ", sizeof(charstr)-strlen(charstr)-1);
         }
-        p++; // next byte
+        p++; /* Next byte */
     }
 
     if (strlen(hexstr) > 0) {
 		
-        // print rest of buffer if not empty
+        /* Print rest of buffer if not empty */
 		
         printf("%-90.90s\n", hexstr );
     }
