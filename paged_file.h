@@ -1,7 +1,11 @@
-// Copyright (C) 2015 Kakaroto
+/*
 
-// This software is distributed under the terms of the GNU General Public
-// License ("GPL") version 3, as published by the Free Software Foundation.
+Copyright 2015 Kakaroto
+
+This software is distributed under the terms of the GNU General Public
+License ("GPL") version 3, as published by the Free Software Foundation.
+
+*/
 
 #ifndef __PAGED_FILE_H__
 #define __PAGED_FILE_H__

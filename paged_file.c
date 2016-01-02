@@ -1,7 +1,11 @@
-// Copyright (C) 2015 Kakaroto
+/*
 
-// This software is distributed under the terms of the GNU General Public
-// License ("GPL") version 3, as published by the Free Software Foundation.
+Copyright 2015 Kakaroto
+
+This software is distributed under the terms of the GNU General Public
+License ("GPL") version 3, as published by the Free Software Foundation.
+
+*/
 
 #include "tools.h"
 #include "types.h"
@@ -259,7 +263,7 @@ paged_file_seek (PagedFile *f, u64 offset)
 
   if (f->crypt != PAGED_FILE_CRYPT_NONE) {
 	
-    // TODO: support other crypto
+    /* TODO: Support other cryptographic algorithms */
 	
     if (f->crypt == PAGED_FILE_CRYPT_AES_128_CBC ||
         f->crypt == PAGED_FILE_CRYPT_AES_256_CBC) {

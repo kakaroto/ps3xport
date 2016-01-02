@@ -1,7 +1,11 @@
-// Copyright (C) 2015 Kakaroto
+/*
 
-// This software is distributed under the terms of the GNU General Public
-// License ("GPL") version 3, as published by the Free Software Foundation.
+Copyright 2015 Kakaroto
+
+This software is distributed under the terms of the GNU General Public
+License ("GPL") version 3, as published by the Free Software Foundation.
+
+*/
 
 #ifndef __ARCHIVE_H__
 #define __ARCHIVE_H__
@@ -52,7 +56,7 @@ typedef struct {
     } eos;
   };
   FileStat fsstat;
-  u32 flags; // 1 == dev_flash2
+  u32 flags; /* 1 == dev_flash2 */
 } __attribute__((packed)) ArchiveFile;
 
 #define ARCHIVE_FILE_FROM_BE(x)                 \
@@ -74,7 +78,7 @@ typedef struct {
     } eos;
   };
   FileStat fsstat;
-  u32 flags; // must be 1 for normal or 3 for dev_flash2
+  u32 flags; /* must be 1 for normal or 3 for dev_flash2 */
 } __attribute__((packed)) ArchiveDirectory;
 
 #define ARCHIVE_DIRECTORY_FROM_BE(x)                 \
@@ -87,8 +91,8 @@ typedef struct {
 #define ARCHIVE_DIRECTORY_EOS_TO_BE(x) ARCHIVE_DIRECTORY_EOS_FROM_BE (x)
 
 typedef struct {
-  u32 encryption_type; // 0x30 for IDP or 0x40 for key seed
-  u32 dat_type; // 5 for a normal+copy-protected backup, 3 for a normal-only backup
+  u32 encryption_type; /* 0x30 for IDP or 0x40 for key seed */
+  u32 dat_type; /* 5 for a normal+copy-protected backup, 3 for a normal-only backup */
   u8 hash[0x14];
   u8 key_seed[0x14];
   u8 padding[0x10];
@@ -103,8 +107,8 @@ typedef struct {
 typedef struct {
   u64 id;
   u32 index;
-  u8 archive_type; // 4 for copy protected, 5 for normal (and data?)
-  u8 file_type;  // could be 1 for index and 0 for data archives
+  u8 archive_type; /* 4 for copy protected, 5 for normal (and data?) */
+  u8 file_type;  /* could be 1 for index and 0 for data archives */
   u16 padding;
 } __attribute__((packed)) ArchiveHeader;
 

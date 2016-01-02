@@ -1,7 +1,15 @@
-// Copyright 2010            Sven Peter <svenpeter@gmail.com>
-// Copyright 2007,2008,2010  Segher Boessenkool  <segher@kernel.crashing.org>
-// Licensed under the terms of the GNU GPL, version 2
-// http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
+/*
+
+Copyright 2010
+Sven Peter <svenpeter@gmail.com>
+
+Copyright 2007, 2008, 2010
+Segher Boessenkool <segher@kernel.crashing.org>
+
+Licensed under the terms of the GNU GPL, version 2
+http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
+
+*/
 
 #include <sys/types.h>
 #include <stdio.h>
@@ -26,7 +34,7 @@
 #include "sha1.h"
 #include "common.h"
 
-// misc
+/* Miscellaneous */
 
 void print_hash(u8 *ptr, u32 len)
 {
@@ -85,7 +93,7 @@ void get_rand(u8 *bfr, u32 size)
 }
 #endif
 
-// crypto
+/* Cryptography */
 
 void aes256cbc(u8 *key, u8 *iv_in, u8 *in, u64 len, u8 *out)
 {
@@ -282,7 +290,7 @@ void aes128ctr(u8 *key, u8 *iv, u8 *in, u64 len, u8 *out)
 		if ((i & 0xf) == 0) {
 			AES_encrypt(iv, ctr, &k);
 
-			// increase nonce
+			/* Increase nonce */
 			
 			tmp = be64(iv + 8) + 1;
 			wbe64(iv + 8, tmp);
@@ -307,7 +315,7 @@ void aes128_enc(u8 *key, const u8 *in, u8 *out) {
     AES_encrypt(in, out, &k);
 }
 
-// FIXME: use a non-broken sha1.c *sigh*
+/* FIXME: use a non-broken sha1.c *sigh* */
 
 static void sha1_fixup(struct SHA1Context *ctx, u8 *digest)
 {
@@ -337,12 +345,12 @@ void sha1_hmac(u8 *key, u8 *data, u32 len, u8 *digest)
 	struct SHA1Context ctx;
 	u32 i;
 	u8 ipad[0x40];
-	u8 tmp[0x40 + 0x14]; // opad + hash (ipad + message)
+	u8 tmp[0x40 + 0x14]; /* OPAD + hash (IPAD + message) */
 
 	SHA1Reset(&ctx);
 
 	for (i = 0; i < sizeof ipad; i++) {
-		tmp[i] = key[i] ^ 0x5c; // opad
+		tmp[i] = key[i] ^ 0x5c; /* OPAD */
 		ipad[i] = key[i] ^ 0x36;
 	}
 
@@ -364,7 +372,7 @@ void HMACReset(HMACContext *ctx, u8 *key)
 	SHA1Reset(&ctx->sha1);
 
 	for (i = 0; i < sizeof ipad; i++) {
-		ctx->tmp[i] = key[i] ^ 0x5c; // opad
+		ctx->tmp[i] = key[i] ^ 0x5c; /* OPAD */
 		ipad[i] = key[i] ^ 0x36;
 	}
 
@@ -403,7 +411,7 @@ void hex_dump(void *data, int size)
     for(n=1;n<=size;n++) {
         if (n%16 == 1) {
 			
-            // store address for this line
+            /* Store address for this line */
 			
             snprintf(addrstr, sizeof(addrstr), "%.4x",
                ((unsigned int)p-(unsigned int)data) );
@@ -414,36 +422,36 @@ void hex_dump(void *data, int size)
             c = '.';
         }
 
-        // store hex str (for left side)
+        /* Store hex str (for left side) */
 		
         snprintf(bytestr, sizeof(bytestr), "%02X ", *p);
         strncat(hexstr, bytestr, sizeof(hexstr)-strlen(hexstr)-1);
 
-        // store char str (for right side)
+        /* Store char str (for right side) */
 		
         snprintf(bytestr, sizeof(bytestr), "%c", c);
         strncat(charstr, bytestr, sizeof(charstr)-strlen(charstr)-1);
 
         if(n%16 == 0) {
 			
-            // line completed
+            /* Line completed */
 			
             printf("[%4.4s]   %-50.50s  %s\n", addrstr, hexstr, charstr);
             hexstr[0] = 0;
             charstr[0] = 0;
         } else if(n%8 == 0) {
 			
-            // half line: add whitespaces
+            /* Half line: add white spaces */
 			
             strncat(hexstr, "  ", sizeof(hexstr)-strlen(hexstr)-1);
             strncat(charstr, " ", sizeof(charstr)-strlen(charstr)-1);
         }
-        p++; // next byte
+        p++; /* Next byte */
     }
 
     if (strlen(hexstr) > 0) {
 		
-        // print rest of buffer if not empty
+        /* Print the rest of the buffer if not empty */
 		
         printf("[%4.4s]   %-50.50s  %s\n", addrstr, hexstr, charstr);
     }
