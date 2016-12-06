@@ -301,12 +301,12 @@ paged_file_splice (PagedFile *f, PagedFile *from, u64 len)
 {
   char buffer[1024];
   u64 total = 0;
-  int size;
+  u64 size; // fixed to prevent overflow in size = len - total below
   int read;
 
   while (len == (u64)-1 || total < len) {
     size = len - total;
-    if (len == (u64)-1 || (u32) size > sizeof(buffer))
+    if (len == (u64)-1 || size > sizeof(buffer))
       size = sizeof(buffer);
 
     read = paged_file_read (from, buffer, size);
