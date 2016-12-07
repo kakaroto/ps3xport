@@ -524,7 +524,7 @@ archive_find_file (ArchiveIndex *archive_index, const char *path,
     }
     current = current->next;
     if (*position + file->fsstat.file_size >= (u64) stat_buf.st_size) {
-      *position = 0x50;
+      *position = 0x50 + (*position + file->fsstat.file_size) % stat_buf.st_size;
       (*index)++;
       snprintf (data_path, sizeof(data_path), "%s/%s_%02d.dat", path, archive_index->prefix, *index);
       if (stat (data_path, &stat_buf) != 0)
@@ -551,7 +551,7 @@ archive_extract (ArchiveIndex *archive_index, const char *path, u32 index,
     die ("Couldn't open output file : %s\n", output);
 
   while (size > 0) {
-    int read;
+    u64 read; // fix a potential overflow
 
     snprintf (filename, sizeof(filename), "%s/%s_%02d.dat", path, archive_index->prefix, index);
     if (!archive_open (filename, &in, &dat_header))
