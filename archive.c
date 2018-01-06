@@ -812,8 +812,8 @@ archive_dump (const char *path, const char *prefix, const char *output)
     if (!fd)
       die ("Error opening output file %s\n", buffer);
     while (len > 0) {
-      int read;
-      u32 size = len;
+      u64 read;
+      u64 size = len;
 
       if (!open) {
         snprintf (buffer, sizeof(buffer), "%s/%s_%02d.dat", path, prefix, index);
